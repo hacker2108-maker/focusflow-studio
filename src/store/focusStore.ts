@@ -1,0 +1,251 @@
+import { create } from "zustand";
+import { persist } from "zustand/middleware";
+import type { FocusSession, FocusTimer, FocusPreset } from "@/types";
+import { generateId, getToday } from "@/lib/utils";
+
+const DEFAULT_PRESET: FocusPreset = {
+  workMinutes: 25,
+  breakMinutes: 5,
+  longBreakMinutes: 15,
+  sessionsBeforeLongBreak: 4,
+};
+
+interface FocusState {
+  sessions: FocusSession[];
+  timer: FocusTimer;
+  preset: FocusPreset;
+  
+  // Timer Actions
+  startTimer: (mode: "pomodoro" | "deepFocus", task?: string, customDuration?: number) => void;
+  pauseTimer: () => void;
+  resumeTimer: () => void;
+  resetTimer: () => void;
+  completeSession: (note?: string) => void;
+  skipBreak: () => void;
+  
+  // Get current time remaining
+  getTimeRemaining: () => number;
+  getElapsedTime: () => number;
+  
+  // Preset Actions
+  updatePreset: (preset: Partial<FocusPreset>) => void;
+  
+  // Session Actions
+  addSession: (session: Omit<FocusSession, "id">) => void;
+  deleteSession: (id: string) => void;
+  
+  // Data management
+  importData: (sessions: FocusSession[]) => void;
+  clearAllData: () => void;
+}
+
+const getInitialTimer = (): FocusTimer => ({
+  isRunning: false,
+  isPaused: false,
+  mode: "pomodoro",
+  phase: "work",
+  startTimestamp: null,
+  pausedAt: null,
+  elapsedBeforePause: 0,
+  totalDuration: DEFAULT_PRESET.workMinutes * 60,
+  currentSession: 1,
+  task: undefined,
+});
+
+export const useFocusStore = create<FocusState>()(
+  persist(
+    (set, get) => ({
+      sessions: [],
+      timer: getInitialTimer(),
+      preset: DEFAULT_PRESET,
+
+      startTimer: (mode, task, customDuration) => {
+        const { preset } = get();
+        const duration = customDuration ?? (mode === "pomodoro" ? preset.workMinutes * 60 : 60 * 60); // Default 1hr for deep focus
+        
+        set({
+          timer: {
+            isRunning: true,
+            isPaused: false,
+            mode,
+            phase: "work",
+            startTimestamp: Date.now(),
+            pausedAt: null,
+            elapsedBeforePause: 0,
+            totalDuration: duration,
+            currentSession: 1,
+            task,
+          },
+        });
+      },
+
+      pauseTimer: () => {
+        const { timer } = get();
+        if (!timer.isRunning || timer.isPaused) return;
+
+        const now = Date.now();
+        const elapsed = timer.startTimestamp 
+          ? Math.floor((now - timer.startTimestamp) / 1000) + timer.elapsedBeforePause
+          : timer.elapsedBeforePause;
+
+        set({
+          timer: {
+            ...timer,
+            isPaused: true,
+            pausedAt: now,
+            elapsedBeforePause: elapsed,
+          },
+        });
+      },
+
+      resumeTimer: () => {
+        const { timer } = get();
+        if (!timer.isPaused) return;
+
+        set({
+          timer: {
+            ...timer,
+            isPaused: false,
+            startTimestamp: Date.now(),
+            pausedAt: null,
+          },
+        });
+      },
+
+      resetTimer: () => {
+        set({ timer: getInitialTimer() });
+      },
+
+      completeSession: (note) => {
+        const { timer, preset, sessions } = get();
+        const elapsed = get().getElapsedTime();
+        const durationMinutes = Math.floor(elapsed / 60);
+
+        // Log the session
+        if (durationMinutes > 0) {
+          const session: FocusSession = {
+            id: generateId(),
+            date: getToday(),
+            startTime: timer.startTimestamp || Date.now(),
+            durationMinutes,
+            mode: timer.mode,
+            task: timer.task,
+            note,
+            completed: true,
+          };
+          set({ sessions: [...sessions, session] });
+        }
+
+        // Handle pomodoro phases
+        if (timer.mode === "pomodoro" && timer.phase === "work") {
+          const nextSession = timer.currentSession + 1;
+          const isLongBreak = timer.currentSession % preset.sessionsBeforeLongBreak === 0;
+          const breakDuration = isLongBreak ? preset.longBreakMinutes : preset.breakMinutes;
+
+          set({
+            timer: {
+              ...timer,
+              phase: isLongBreak ? "longBreak" : "break",
+              totalDuration: breakDuration * 60,
+              startTimestamp: Date.now(),
+              elapsedBeforePause: 0,
+              isPaused: false,
+              currentSession: nextSession,
+            },
+          });
+        } else if (timer.mode === "pomodoro" && (timer.phase === "break" || timer.phase === "longBreak")) {
+          // Start next work session
+          set({
+            timer: {
+              ...timer,
+              phase: "work",
+              totalDuration: preset.workMinutes * 60,
+              startTimestamp: Date.now(),
+              elapsedBeforePause: 0,
+              isPaused: false,
+            },
+          });
+        } else {
+          // Deep focus - just reset
+          set({ timer: getInitialTimer() });
+        }
+      },
+
+      skipBreak: () => {
+        const { timer, preset } = get();
+        if (timer.phase !== "break" && timer.phase !== "longBreak") return;
+
+        set({
+          timer: {
+            ...timer,
+            phase: "work",
+            totalDuration: preset.workMinutes * 60,
+            startTimestamp: Date.now(),
+            elapsedBeforePause: 0,
+            isPaused: false,
+          },
+        });
+      },
+
+      getTimeRemaining: () => {
+        const { timer } = get();
+        if (!timer.isRunning) return timer.totalDuration;
+
+        const elapsed = get().getElapsedTime();
+        return Math.max(0, timer.totalDuration - elapsed);
+      },
+
+      getElapsedTime: () => {
+        const { timer } = get();
+        if (!timer.isRunning) return 0;
+
+        if (timer.isPaused) {
+          return timer.elapsedBeforePause;
+        }
+
+        const now = Date.now();
+        const sinceStart = timer.startTimestamp 
+          ? Math.floor((now - timer.startTimestamp) / 1000)
+          : 0;
+        
+        return timer.elapsedBeforePause + sinceStart;
+      },
+
+      updatePreset: (presetUpdates) => {
+        set((state) => ({
+          preset: { ...state.preset, ...presetUpdates },
+        }));
+      },
+
+      addSession: (sessionData) => {
+        const session: FocusSession = {
+          ...sessionData,
+          id: generateId(),
+        };
+        set((state) => ({ sessions: [...state.sessions, session] }));
+      },
+
+      deleteSession: (id) => {
+        set((state) => ({
+          sessions: state.sessions.filter((s) => s.id !== id),
+        }));
+      },
+
+      importData: (sessions) => {
+        set({ sessions });
+      },
+
+      clearAllData: () => {
+        set({ sessions: [], timer: getInitialTimer() });
+      },
+    }),
+    {
+      name: "focushabit-focus",
+      partialize: (state) => ({
+        sessions: state.sessions,
+        timer: state.timer,
+        preset: state.preset,
+      }),
+    }
+  )
+);
