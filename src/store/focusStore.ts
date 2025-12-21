@@ -8,6 +8,10 @@ const DEFAULT_PRESET: FocusPreset = {
   breakMinutes: 5,
   longBreakMinutes: 15,
   sessionsBeforeLongBreak: 4,
+  deepFocusMinutes: 60,
+  autoStartBreaks: false,
+  autoStartWork: false,
+  alarmSound: "chime",
 };
 
 interface FocusState {
@@ -61,7 +65,7 @@ export const useFocusStore = create<FocusState>()(
 
       startTimer: (mode, task, customDuration) => {
         const { preset } = get();
-        const duration = customDuration ?? (mode === "pomodoro" ? preset.workMinutes * 60 : 60 * 60); // Default 1hr for deep focus
+        const duration = customDuration ?? (mode === "pomodoro" ? preset.workMinutes * 60 : preset.deepFocusMinutes * 60);
         
         set({
           timer: {

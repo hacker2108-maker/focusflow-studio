@@ -58,6 +58,10 @@ export interface FocusPreset {
   breakMinutes: number;
   longBreakMinutes: number;
   sessionsBeforeLongBreak: number;
+  deepFocusMinutes: number;
+  autoStartBreaks: boolean;
+  autoStartWork: boolean;
+  alarmSound: "chime" | "bell" | "gentle" | "none";
 }
 
 // Insights Types

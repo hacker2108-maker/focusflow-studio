@@ -7,6 +7,10 @@ const DEFAULT_PRESET: FocusPreset = {
   breakMinutes: 5,
   longBreakMinutes: 15,
   sessionsBeforeLongBreak: 4,
+  deepFocusMinutes: 60,
+  autoStartBreaks: false,
+  autoStartWork: false,
+  alarmSound: "chime",
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
