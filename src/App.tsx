@@ -11,6 +11,8 @@ import Habits from "./pages/Habits";
 import Focus from "./pages/Focus";
 import Insights from "./pages/Insights";
 import Settings from "./pages/Settings";
+import Journal from "./pages/Journal";
+import Calendar from "./pages/Calendar";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -34,6 +36,8 @@ const App = () => (
                       <Route path="/" element={<Dashboard />} />
                       <Route path="/habits" element={<Habits />} />
                       <Route path="/focus" element={<Focus />} />
+                      <Route path="/journal" element={<Journal />} />
+                      <Route path="/calendar" element={<Calendar />} />
                       <Route path="/insights" element={<Insights />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="*" element={<NotFound />} />

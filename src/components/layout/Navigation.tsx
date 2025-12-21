@@ -1,14 +1,14 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Timer, BarChart3, Settings } from "lucide-react";
+import { Home, Target, Timer, BarChart3, Settings, BookOpen, CalendarDays } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 
 const navItems = [
-  { to: "/", icon: Home, label: "Dashboard" },
+  { to: "/", icon: Home, label: "Home" },
   { to: "/habits", icon: Target, label: "Habits" },
   { to: "/focus", icon: Timer, label: "Focus" },
-  { to: "/insights", icon: BarChart3, label: "Insights" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+  { to: "/journal", icon: BookOpen, label: "Journal" },
+  { to: "/calendar", icon: CalendarDays, label: "Calendar" },
 ];
 
 export function BottomNav() {
@@ -54,6 +54,12 @@ export function BottomNav() {
   );
 }
 
+const sidebarNavItems = [
+  ...navItems,
+  { to: "/insights", icon: BarChart3, label: "Insights" },
+  { to: "/settings", icon: Settings, label: "Settings" },
+];
+
 export function Sidebar() {
   const location = useLocation();
 
@@ -61,11 +67,11 @@ export function Sidebar() {
     <aside className="hidden md:flex flex-col w-64 h-screen glass-strong border-r border-border/50 fixed left-0 top-0">
       <div className="p-6">
         <h1 className="text-xl font-bold text-gradient">FocusHabit</h1>
-        <p className="text-xs text-muted-foreground mt-1">Build better habits</p>
+        <p className="text-xs text-muted-foreground mt-1">Your productivity hub</p>
       </div>
       
-      <nav className="flex-1 px-3 py-4 space-y-1">
-        {navItems.map((item) => {
+      <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {sidebarNavItems.map((item) => {
           const isActive = location.pathname === item.to;
           return (
             <NavLink
