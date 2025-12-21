@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2 } from "lucide-react";
+import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2, Volume2 } from "lucide-react";
 import { useFocusStore } from "@/store/focusStore";
 import { useHabitStore } from "@/store/habitStore";
 import { formatTime, getToday, isHabitDueToday } from "@/lib/utils";
+import { alarmSound } from "@/lib/audio";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -40,7 +41,9 @@ export default function Focus() {
         // Show completion dialog for work sessions
         if (timer.phase === "work") {
           setShowCompleteDialog(true);
-          // Play notification sound (if browser supports it)
+          // Play alarm sound
+          alarmSound.playAlarm();
+          // Show browser notification (if permitted)
           if ("Notification" in window && Notification.permission === "granted") {
             new Notification("Focus session complete!", {
               body: timer.task || "Great work! Time for a break.",
@@ -48,6 +51,8 @@ export default function Focus() {
             });
           }
         } else {
+          // Play softer sound for break end
+          alarmSound.playBreakEnd();
           toast.success("Break complete! Ready for the next session?");
           completeSession();
         }
