@@ -134,6 +134,15 @@
     @apply bg-background text-foreground font-sans;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  /* Safe area padding for mobile */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .safe-area-pt {
+    padding-top: env(safe-area-inset-top, 0);
+  }
 }
 
 @layer utilities {
