@@ -14,7 +14,277 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      calendar_events: {
+        Row: {
+          color: string | null
+          created_at: string
+          date: string
+          description: string | null
+          end_time: string
+          id: string
+          is_recurring: boolean | null
+          notification_id: number | null
+          parent_event_id: string | null
+          recurrence_end_date: string | null
+          recurrence_interval: number | null
+          recurrence_type: string | null
+          reminder: number | null
+          start_time: string
+          title: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          date: string
+          description?: string | null
+          end_time: string
+          id?: string
+          is_recurring?: boolean | null
+          notification_id?: number | null
+          parent_event_id?: string | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number | null
+          recurrence_type?: string | null
+          reminder?: number | null
+          start_time: string
+          title: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          date?: string
+          description?: string | null
+          end_time?: string
+          id?: string
+          is_recurring?: boolean | null
+          notification_id?: number | null
+          parent_event_id?: string | null
+          recurrence_end_date?: string | null
+          recurrence_interval?: number | null
+          recurrence_type?: string | null
+          reminder?: number | null
+          start_time?: string
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "calendar_events_parent_event_id_fkey"
+            columns: ["parent_event_id"]
+            isOneToOne: false
+            referencedRelation: "calendar_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      focus_sessions: {
+        Row: {
+          completed: boolean | null
+          created_at: string
+          date: string
+          duration_minutes: number
+          id: string
+          mode: string
+          note: string | null
+          start_time: number
+          task: string | null
+          user_id: string
+        }
+        Insert: {
+          completed?: boolean | null
+          created_at?: string
+          date: string
+          duration_minutes: number
+          id?: string
+          mode?: string
+          note?: string | null
+          start_time: number
+          task?: string | null
+          user_id: string
+        }
+        Update: {
+          completed?: boolean | null
+          created_at?: string
+          date?: string
+          duration_minutes?: number
+          id?: string
+          mode?: string
+          note?: string | null
+          start_time?: number
+          task?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      habit_logs: {
+        Row: {
+          created_at: string
+          date: string
+          habit_id: string
+          id: string
+          note: string | null
+          status: string
+          timestamp: number
+          user_id: string
+          value: number | null
+        }
+        Insert: {
+          created_at?: string
+          date: string
+          habit_id: string
+          id?: string
+          note?: string | null
+          status?: string
+          timestamp?: number
+          user_id: string
+          value?: number | null
+        }
+        Update: {
+          created_at?: string
+          date?: string
+          habit_id?: string
+          id?: string
+          note?: string | null
+          status?: string
+          timestamp?: number
+          user_id?: string
+          value?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habit_logs_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habits: {
+        Row: {
+          archived: boolean | null
+          color: string | null
+          created_at: string
+          description: string | null
+          goal_target: number | null
+          goal_type: string
+          id: string
+          name: string
+          reminder_time: string | null
+          schedule_days_of_week: number[] | null
+          schedule_times_per_week: number | null
+          schedule_type: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          archived?: boolean | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          goal_target?: number | null
+          goal_type?: string
+          id?: string
+          name: string
+          reminder_time?: string | null
+          schedule_days_of_week?: number[] | null
+          schedule_times_per_week?: number | null
+          schedule_type?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          archived?: boolean | null
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          goal_target?: number | null
+          goal_type?: string
+          id?: string
+          name?: string
+          reminder_time?: string | null
+          schedule_days_of_week?: number[] | null
+          schedule_times_per_week?: number | null
+          schedule_type?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      journal_entries: {
+        Row: {
+          content: string | null
+          created_at: string
+          date: string
+          id: string
+          mood: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          date: string
+          id?: string
+          mood?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          date?: string
+          id?: string
+          mood?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          focus_mode_enabled: boolean | null
+          focus_preset: Json | null
+          id: string
+          theme: string | null
+          updated_at: string
+          user_id: string
+          weather_location: string | null
+          week_starts_monday: boolean | null
+        }
+        Insert: {
+          created_at?: string
+          focus_mode_enabled?: boolean | null
+          focus_preset?: Json | null
+          id?: string
+          theme?: string | null
+          updated_at?: string
+          user_id: string
+          weather_location?: string | null
+          week_starts_monday?: boolean | null
+        }
+        Update: {
+          created_at?: string
+          focus_mode_enabled?: boolean | null
+          focus_preset?: Json | null
+          id?: string
+          theme?: string | null
+          updated_at?: string
+          user_id?: string
+          weather_location?: string | null
+          week_starts_monday?: boolean | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
