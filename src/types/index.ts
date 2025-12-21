@@ -73,6 +73,7 @@ export interface AppSettings {
   theme: "light" | "dark" | "system";
   weekStartsMonday: boolean;
   defaultFocusPreset: FocusPreset;
+  focusModeEnabled?: boolean;
 }
 
 // Chart Data Types

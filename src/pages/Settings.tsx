@@ -1,14 +1,18 @@
-import { Moon, Sun, Download, Upload, Trash2 } from "lucide-react";
+import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 
 export default function Settings() {
-  const { settings, setTheme, resetSettings, clearAllData: clearSettings, weeklyReviews } = useSettingsStore();
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+  const { settings, setTheme, updateSettings, resetSettings, clearAllData: clearSettings, weeklyReviews } = useSettingsStore();
   const { habits, logs, clearAllData: clearHabits } = useHabitStore();
   const { sessions, clearAllData: clearFocus } = useFocusStore();
 
@@ -54,7 +58,14 @@ export default function Settings() {
     }
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    toast.success("Signed out");
+    navigate("/auth");
+  };
+
   const isDark = settings.theme === "dark";
+  const focusModeEnabled = settings.focusModeEnabled ?? false;
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -63,6 +74,23 @@ export default function Settings() {
         <p className="text-muted-foreground mt-1">Customize your experience</p>
       </header>
 
+      {/* Account */}
+      <Card className="glass">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Account</p>
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
+            </div>
+            <Button variant="outline" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Appearance */}
       <Card className="glass">
         <CardContent className="p-6 space-y-6">
           <div className="flex items-center justify-between">
@@ -78,6 +106,40 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* Focus Mode */}
+      <Card className="glass border-primary/20">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {focusModeEnabled ? (
+                <BellOff className="w-5 h-5 text-primary" />
+              ) : (
+                <Bell className="w-5 h-5 text-muted-foreground" />
+              )}
+              <div>
+                <p className="font-medium">Focus Mode</p>
+                <p className="text-sm text-muted-foreground">
+                  {focusModeEnabled 
+                    ? "Notifications silenced during focus sessions" 
+                    : "Mute notifications during focus sessions"}
+                </p>
+              </div>
+            </div>
+            <Switch 
+              checked={focusModeEnabled} 
+              onCheckedChange={c => updateSettings({ focusModeEnabled: c })} 
+            />
+          </div>
+          {focusModeEnabled && (
+            <p className="text-xs text-muted-foreground mt-3 p-3 bg-primary/5 rounded-lg">
+              Note: This app cannot block system notifications. For best results, enable "Do Not Disturb" 
+              on your device during focus sessions.
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Data Management */}
       <Card className="glass">
         <CardContent className="p-6 space-y-4">
           <h3 className="font-semibold">Data Management</h3>
@@ -108,7 +170,7 @@ export default function Settings() {
       <Card className="glass">
         <CardContent className="p-6">
           <p className="text-sm text-muted-foreground text-center">
-            FocusHabit v1.0 · All data stored locally
+            FocusHabit v1.0 · Data synced to your account
           </p>
         </CardContent>
       </Card>
