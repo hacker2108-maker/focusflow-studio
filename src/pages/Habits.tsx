@@ -91,6 +91,8 @@ export default function Habits() {
     } else {
       addHabit(habitData);
       toast.success("Habit created");
+      // Switch to active filter so user can see the new habit
+      setFilter("active");
     }
     
     resetForm();
