@@ -15,17 +15,25 @@ import {
   Zap,
   Heart,
   Target,
-  X
+  X,
+  Info,
+  Activity,
+  Smartphone,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { motion, AnimatePresence } from "framer-motion";
+import { useMotionDetection } from "@/hooks/useMotionDetection";
+import { cn } from "@/lib/utils";
 
 interface Exercise {
   name: string;
   duration: number | null;
   reps: number | null;
   rest: number;
+  instructions?: string;
+  imageUrl?: string;
+  targetMuscles?: string[];
 }
 
 interface WorkoutPlan {
@@ -36,6 +44,7 @@ interface WorkoutPlan {
   duration_minutes: number;
   category: string;
   exercises: Exercise[];
+  image_url?: string;
 }
 
 const categoryIcons: Record<string, React.ElementType> = {
@@ -52,6 +61,72 @@ const difficultyColors: Record<string, string> = {
   advanced: "bg-red-500/20 text-red-500",
 };
 
+// Default exercise library with images and instructions
+const defaultExercises: Record<string, Partial<Exercise>> = {
+  "jumping jacks": {
+    instructions: "Stand with feet together, jump while spreading legs and raising arms overhead, return to start position.",
+    imageUrl: "https://images.unsplash.com/photo-1571019614242-c5c5dee9f50b?w=400&h=300&fit=crop",
+    targetMuscles: ["full body", "cardio"],
+  },
+  "push-ups": {
+    instructions: "Place hands shoulder-width apart, lower chest to floor keeping body straight, push back up. Keep core engaged.",
+    imageUrl: "https://images.unsplash.com/photo-1598971639058-fab3c3109a00?w=400&h=300&fit=crop",
+    targetMuscles: ["chest", "triceps", "shoulders"],
+  },
+  "squats": {
+    instructions: "Stand with feet shoulder-width apart, lower hips back and down as if sitting in a chair, keep chest up and knees behind toes.",
+    imageUrl: "https://images.unsplash.com/photo-1574680096145-d05b474e2155?w=400&h=300&fit=crop",
+    targetMuscles: ["quads", "glutes", "hamstrings"],
+  },
+  "plank": {
+    instructions: "Rest on forearms and toes, keep body in straight line from head to heels, engage core and hold position.",
+    imageUrl: "https://images.unsplash.com/photo-1566241142559-40e1dab266c6?w=400&h=300&fit=crop",
+    targetMuscles: ["core", "shoulders"],
+  },
+  "lunges": {
+    instructions: "Step forward with one leg, lower back knee toward ground, front knee stays behind toes, push back to start.",
+    imageUrl: "https://images.unsplash.com/photo-1434608519344-49d77a699e1d?w=400&h=300&fit=crop",
+    targetMuscles: ["quads", "glutes", "hamstrings"],
+  },
+  "burpees": {
+    instructions: "Squat down, kick feet back to plank, do a push-up, jump feet forward, explosively jump up with arms overhead.",
+    imageUrl: "https://images.unsplash.com/photo-1599058945522-28d584b6f0ff?w=400&h=300&fit=crop",
+    targetMuscles: ["full body", "cardio"],
+  },
+  "mountain climbers": {
+    instructions: "Start in plank position, alternately drive knees toward chest rapidly while keeping hips low.",
+    imageUrl: "https://images.unsplash.com/photo-1434682881908-b43d0467b798?w=400&h=300&fit=crop",
+    targetMuscles: ["core", "cardio", "shoulders"],
+  },
+  "high knees": {
+    instructions: "Run in place, bringing knees up to hip level alternately, pump arms for momentum.",
+    imageUrl: "https://images.unsplash.com/photo-1476480862126-209bfaa8edc8?w=400&h=300&fit=crop",
+    targetMuscles: ["legs", "cardio"],
+  },
+  "crunches": {
+    instructions: "Lie on back with knees bent, hands behind head, curl upper body toward knees, lower slowly.",
+    imageUrl: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?w=400&h=300&fit=crop",
+    targetMuscles: ["abs", "core"],
+  },
+  "bicep curls": {
+    instructions: "Hold weights at sides, curl toward shoulders keeping elbows stationary, lower slowly.",
+    imageUrl: "https://images.unsplash.com/photo-1581009146145-b5ef050c149a?w=400&h=300&fit=crop",
+    targetMuscles: ["biceps", "forearms"],
+  },
+};
+
+function getExerciseDetails(exercise: Exercise): Exercise {
+  const key = exercise.name.toLowerCase();
+  const defaults = defaultExercises[key];
+  
+  return {
+    ...exercise,
+    instructions: exercise.instructions || defaults?.instructions || "Perform the exercise with proper form.",
+    imageUrl: exercise.imageUrl || defaults?.imageUrl,
+    targetMuscles: exercise.targetMuscles || defaults?.targetMuscles || [],
+  };
+}
+
 export function WorkoutPlans() {
   const [plans, setPlans] = useState<WorkoutPlan[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<WorkoutPlan | null>(null);
@@ -61,6 +136,17 @@ export function WorkoutPlans() {
   const [isResting, setIsResting] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [showExerciseInfo, setShowExerciseInfo] = useState(false);
+
+  const {
+    isSupported: motionSupported,
+    isTracking: motionTracking,
+    repCount,
+    intensity,
+    startTracking: startMotion,
+    stopTracking: stopMotion,
+    resetCount,
+  } = useMotionDetection();
 
   useEffect(() => {
     fetchPlans();
@@ -78,22 +164,58 @@ export function WorkoutPlans() {
 
       const formattedPlans = (data || []).map((plan) => ({
         ...plan,
-        exercises: (plan.exercises as unknown as Exercise[]) || [],
+        exercises: ((plan.exercises as unknown as Exercise[]) || []).map(getExerciseDetails),
       }));
 
-      setPlans(formattedPlans);
+      // Add default workouts if none exist
+      if (formattedPlans.length === 0) {
+        const defaultPlans: WorkoutPlan[] = [
+          {
+            id: "default-1",
+            title: "Quick Cardio Blast",
+            description: "15-minute high-intensity cardio workout",
+            difficulty: "intermediate",
+            duration_minutes: 15,
+            category: "cardio",
+            exercises: [
+              { name: "Jumping Jacks", duration: 30, reps: null, rest: 10 },
+              { name: "High Knees", duration: 30, reps: null, rest: 10 },
+              { name: "Burpees", duration: null, reps: 10, rest: 15 },
+              { name: "Mountain Climbers", duration: 30, reps: null, rest: 10 },
+            ].map(getExerciseDetails),
+          },
+          {
+            id: "default-2",
+            title: "Strength Builder",
+            description: "Full body strength training",
+            difficulty: "beginner",
+            duration_minutes: 20,
+            category: "strength",
+            exercises: [
+              { name: "Push-ups", duration: null, reps: 15, rest: 30 },
+              { name: "Squats", duration: null, reps: 20, rest: 30 },
+              { name: "Lunges", duration: null, reps: 12, rest: 30 },
+              { name: "Plank", duration: 45, reps: null, rest: 20 },
+            ].map(getExerciseDetails),
+          }
+        ];
+        setPlans(defaultPlans);
+      } else {
+        setPlans(formattedPlans);
+      }
     } catch (error) {
       console.error("Error fetching workout plans:", error);
     }
     setIsLoading(false);
   };
 
-  const startWorkout = (plan: WorkoutPlan) => {
+  const startWorkout = async (plan: WorkoutPlan) => {
     setSelectedPlan(plan);
     setIsWorkoutActive(true);
     setCurrentExerciseIndex(0);
     setIsResting(false);
     setIsPaused(false);
+    resetCount();
     
     const firstExercise = plan.exercises[0];
     if (firstExercise.duration) {
@@ -101,17 +223,30 @@ export function WorkoutPlans() {
     } else {
       setTimeRemaining(0);
     }
+
+    // Start motion detection for rep-based exercises
+    if (motionSupported && firstExercise.reps) {
+      const started = await startMotion();
+      if (started) {
+        toast.success("Motion detection active!", {
+          description: "Move your phone with your exercises",
+          icon: <Smartphone className="w-4 h-4" />,
+        });
+      }
+    }
   };
 
   const completeWorkout = useCallback(async () => {
     if (!selectedPlan) return;
+    
+    stopMotion();
 
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase.from("workout_sessions").insert({
           user_id: user.id,
-          plan_id: selectedPlan.id,
+          plan_id: selectedPlan.id.startsWith("default-") ? null : selectedPlan.id,
           completed_at: new Date().toISOString(),
           exercises_completed: selectedPlan.exercises.length,
           total_exercises: selectedPlan.exercises.length,
@@ -125,13 +260,12 @@ export function WorkoutPlans() {
     toast.success("Workout completed! Great job!");
     setIsWorkoutActive(false);
     setSelectedPlan(null);
-  }, [selectedPlan]);
+  }, [selectedPlan, stopMotion]);
 
-  const nextExercise = useCallback(() => {
+  const nextExercise = useCallback(async () => {
     if (!selectedPlan) return;
 
     if (isResting) {
-      // Move to next exercise
       const nextIndex = currentExerciseIndex + 1;
       if (nextIndex >= selectedPlan.exercises.length) {
         completeWorkout();
@@ -140,27 +274,33 @@ export function WorkoutPlans() {
 
       setCurrentExerciseIndex(nextIndex);
       setIsResting(false);
+      resetCount();
       const nextEx = selectedPlan.exercises[nextIndex];
       setTimeRemaining(nextEx.duration || 0);
+
+      // Start motion tracking for rep exercises
+      if (motionSupported && nextEx.reps && !motionTracking) {
+        await startMotion();
+      }
     } else {
-      // Start rest period
       const currentEx = selectedPlan.exercises[currentExerciseIndex];
       if (currentEx.rest > 0) {
         setIsResting(true);
         setTimeRemaining(currentEx.rest);
+        stopMotion();
       } else {
-        // No rest, move to next exercise
         const nextIndex = currentExerciseIndex + 1;
         if (nextIndex >= selectedPlan.exercises.length) {
           completeWorkout();
           return;
         }
         setCurrentExerciseIndex(nextIndex);
+        resetCount();
         const nextEx = selectedPlan.exercises[nextIndex];
         setTimeRemaining(nextEx.duration || 0);
       }
     }
-  }, [selectedPlan, currentExerciseIndex, isResting, completeWorkout]);
+  }, [selectedPlan, currentExerciseIndex, isResting, completeWorkout, motionSupported, motionTracking, startMotion, stopMotion, resetCount]);
 
   // Timer effect
   useEffect(() => {
@@ -213,11 +353,11 @@ export function WorkoutPlans() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Card className="glass hover:border-primary/30 transition-all cursor-pointer">
+                <Card className="glass hover:border-primary/30 transition-all cursor-pointer border-none">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
-                      <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                        <Icon className="w-6 h-6 text-primary" />
+                      <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0">
+                        <Icon className="w-7 h-7 text-primary" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -241,12 +381,18 @@ export function WorkoutPlans() {
                             <Target className="w-3 h-3" />
                             {plan.exercises.length} exercises
                           </span>
+                          {motionSupported && (
+                            <span className="flex items-center gap-1 text-primary">
+                              <Activity className="w-3 h-3" />
+                              Motion
+                            </span>
+                          )}
                         </div>
                       </div>
                       <Button
                         size="sm"
                         onClick={() => startWorkout(plan)}
-                        className="flex-shrink-0"
+                        className="flex-shrink-0 rounded-xl"
                       >
                         <Play className="w-4 h-4 mr-1" />
                         Start
@@ -261,15 +407,23 @@ export function WorkoutPlans() {
       </div>
 
       {/* Active Workout Dialog */}
-      <Dialog open={isWorkoutActive} onOpenChange={(open) => !open && setIsWorkoutActive(false)}>
-        <DialogContent className="max-w-md">
+      <Dialog open={isWorkoutActive} onOpenChange={(open) => {
+        if (!open) {
+          stopMotion();
+          setIsWorkoutActive(false);
+        }
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>{selectedPlan?.title}</span>
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setIsWorkoutActive(false)}
+                onClick={() => {
+                  stopMotion();
+                  setIsWorkoutActive(false);
+                }}
               >
                 <X className="w-4 h-4" />
               </Button>
@@ -277,7 +431,7 @@ export function WorkoutPlans() {
           </DialogHeader>
 
           {currentExercise && (
-            <div className="space-y-6 py-4">
+            <div className="space-y-4 py-2">
               {/* Progress */}
               <div>
                 <div className="flex justify-between text-sm mb-2">
@@ -297,10 +451,10 @@ export function WorkoutPlans() {
                   initial={{ opacity: 0, scale: 0.95 }}
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  className="text-center py-8"
+                  className="text-center"
                 >
                   {isResting ? (
-                    <>
+                    <div className="py-6">
                       <div className="w-20 h-20 rounded-full bg-secondary/50 flex items-center justify-center mx-auto mb-4">
                         <Timer className="w-10 h-10 text-muted-foreground" />
                       </div>
@@ -308,44 +462,106 @@ export function WorkoutPlans() {
                         Rest
                       </h2>
                       <p className="text-sm text-muted-foreground mt-1">
-                        Get ready for the next exercise
+                        Get ready for: {selectedPlan?.exercises[currentExerciseIndex + 1]?.name}
                       </p>
-                    </>
+                    </div>
                   ) : (
-                    <>
-                      <div className="w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-                        <Dumbbell className="w-10 h-10 text-primary" />
-                      </div>
+                    <div className="space-y-4">
+                      {/* Exercise Image */}
+                      {currentExercise.imageUrl && (
+                        <div className="relative rounded-2xl overflow-hidden h-40">
+                          <img
+                            src={currentExercise.imageUrl}
+                            alt={currentExercise.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            className="absolute top-2 right-2 rounded-full"
+                            onClick={() => setShowExerciseInfo(!showExerciseInfo)}
+                          >
+                            <Info className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      )}
+
                       <h2 className="text-2xl font-bold">{currentExercise.name}</h2>
-                      {currentExercise.reps ? (
-                        <p className="text-lg text-primary mt-2">
-                          {currentExercise.reps} reps
-                        </p>
-                      ) : (
-                        <p className="text-lg text-muted-foreground mt-2">
-                          Hold for time
+
+                      {/* Target Muscles */}
+                      {currentExercise.targetMuscles && currentExercise.targetMuscles.length > 0 && (
+                        <div className="flex flex-wrap justify-center gap-2">
+                          {currentExercise.targetMuscles.map((muscle) => (
+                            <Badge key={muscle} variant="secondary" className="text-xs">
+                              {muscle}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Instructions (collapsible) */}
+                      <AnimatePresence>
+                        {showExerciseInfo && currentExercise.instructions && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: "auto", opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden"
+                          >
+                            <p className="text-sm text-muted-foreground bg-secondary/50 rounded-xl p-3 text-left">
+                              {currentExercise.instructions}
+                            </p>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+
+                      {/* Rep Counter with Motion Detection */}
+                      {currentExercise.reps && (
+                        <div className="space-y-2">
+                          <p className="text-lg text-primary">
+                            {repCount} / {currentExercise.reps} reps
+                          </p>
+                          {motionTracking && (
+                            <div className="space-y-1">
+                              <div className="flex items-center justify-center gap-2 text-xs text-muted-foreground">
+                                <Activity className="w-3 h-3 animate-pulse text-primary" />
+                                Motion detection active
+                              </div>
+                              <Progress value={intensity} className="h-1" />
+                            </div>
+                          )}
+                          {!motionTracking && motionSupported && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={startMotion}
+                              className="gap-2"
+                            >
+                              <Smartphone className="w-4 h-4" />
+                              Enable motion tracking
+                            </Button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Timer Display */}
+                      {timeRemaining > 0 && (
+                        <p className="text-5xl font-mono font-bold mt-4">
+                          {formatTime(timeRemaining)}
                         </p>
                       )}
-                    </>
-                  )}
-
-                  {/* Timer Display */}
-                  {timeRemaining > 0 && (
-                    <div className="mt-6">
-                      <p className="text-5xl font-mono font-bold">
-                        {formatTime(timeRemaining)}
-                      </p>
                     </div>
                   )}
                 </motion.div>
               </AnimatePresence>
 
               {/* Controls */}
-              <div className="flex justify-center gap-4">
+              <div className="flex justify-center gap-3 pt-4">
                 <Button
                   variant="outline"
                   size="lg"
                   onClick={() => setIsPaused(!isPaused)}
+                  className="rounded-xl"
                 >
                   {isPaused ? (
                     <Play className="w-5 h-5" />
@@ -355,13 +571,23 @@ export function WorkoutPlans() {
                 </Button>
 
                 {currentExercise.reps && !isResting && (
-                  <Button size="lg" onClick={nextExercise}>
+                  <Button 
+                    size="lg" 
+                    onClick={nextExercise}
+                    className="rounded-xl"
+                    disabled={repCount < (currentExercise.reps || 0)}
+                  >
                     <Check className="w-5 h-5 mr-2" />
-                    Done
+                    Done ({repCount}/{currentExercise.reps})
                   </Button>
                 )}
 
-                <Button variant="outline" size="lg" onClick={nextExercise}>
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  onClick={nextExercise}
+                  className="rounded-xl"
+                >
                   <SkipForward className="w-5 h-5" />
                 </Button>
               </div>
@@ -369,7 +595,7 @@ export function WorkoutPlans() {
               {/* Next Up */}
               {!isResting &&
                 currentExerciseIndex < (selectedPlan?.exercises.length || 0) - 1 && (
-                  <div className="text-center text-sm text-muted-foreground">
+                  <div className="text-center text-sm text-muted-foreground pt-2">
                     <p>
                       Next:{" "}
                       {selectedPlan?.exercises[currentExerciseIndex + 1]?.name}
