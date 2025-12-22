@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Target, MoreVertical, Archive, Trash2, Edit, Flame, TrendingUp } from "lucide-react";
 import { useHabitStore } from "@/store/habitStore";
@@ -12,7 +12,6 @@ import { Progress } from "@/components/ui/progress";
 import { HABIT_COLORS, DAY_NAMES, type HabitFilter, type Habit } from "@/types";
 import { toast } from "sonner";
 import { HabitFormDialog, type HabitFormData } from "@/components/habits/HabitFormDialog";
-import { PullToRefresh } from "@/components/ui/pull-to-refresh";
 
 export default function Habits() {
   const { habits, logs, filter, setFilter, addHabit, updateHabit, deleteHabit, archiveHabit, unarchiveHabit, logHabit } = useHabitStore();
@@ -21,13 +20,6 @@ export default function Habits() {
   const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
   
   const today = getToday();
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  const handleRefresh = useCallback(async () => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    setRefreshKey(k => k + 1);
-    toast.success("Refreshed!");
-  }, []);
 
   const filteredHabits = habits.filter(h => {
     switch (filter) {
@@ -90,8 +82,7 @@ export default function Habits() {
   });
 
   return (
-    <PullToRefresh onRefresh={handleRefresh}>
-    <div key={refreshKey} className="space-y-6 animate-fade-in pb-24">
+    <div className="space-y-6 animate-fade-in">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-display-sm">Habits</h1>
@@ -375,6 +366,5 @@ export default function Habits() {
         </SheetContent>
       </Sheet>
     </div>
-    </PullToRefresh>
   );
 }

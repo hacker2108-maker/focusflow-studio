@@ -1,7 +1,7 @@
-import { ReactNode, useCallback, useRef, useState, type PointerEvent } from "react";
+import { ReactNode, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { Home, Target, Timer, BookOpen, CalendarDays, BarChart3, Settings, MapPin, StickyNote } from "lucide-react";
+import { Home, Target, Timer, BookOpen, CalendarDays, BarChart3, Settings, MapPin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -9,7 +9,6 @@ const navItems = [
   { to: "/habits", icon: Target, label: "Habits" },
   { to: "/focus", icon: Timer, label: "Focus" },
   { to: "/activity", icon: MapPin, label: "Activity" },
-  { to: "/notes", icon: StickyNote, label: "Notes" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
   { to: "/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/insights", icon: BarChart3, label: "Insights" },
@@ -25,64 +24,17 @@ export function SwipeableNavigation({ children }: SwipeableNavigationProps) {
   const location = useLocation();
   const [direction, setDirection] = useState(0);
 
-  // IMPORTANT: We restrict page-swipe to an edge gesture so it doesn't steal taps/scrolls
-  // from inputs, buttons, and horizontal scrollers.
-  const SWIPE_EDGE_PX = 32;
-  const [dragEnabled, setDragEnabled] = useState(false);
-  const startXRef = useRef<number>(0);
-
   const currentIndex = navItems.findIndex((item) => item.to === location.pathname);
-
-  const shouldBlockPageSwipe = useCallback((target: EventTarget | null) => {
-    const el = target as HTMLElement | null;
-    if (!el) return false;
-
-    // Opt-out for areas that handle their own horizontal gestures.
-    if (el.closest("[data-no-page-swipe]")) return true;
-
-    // Don't hijack interaction controls.
-    if (
-      el.closest(
-        "button, a, input, textarea, select, option, label, [role='button'], [role='switch'], [role='checkbox'], [contenteditable='true']",
-      )
-    ) {
-      return true;
-    }
-
-    return false;
-  }, []);
-
-  const onPointerDownCapture = useCallback(
-    (e: PointerEvent<HTMLDivElement>) => {
-      startXRef.current = e.clientX;
-      const isEdge =
-        e.clientX <= SWIPE_EDGE_PX ||
-        e.clientX >= (window.innerWidth || 0) - SWIPE_EDGE_PX;
-
-      setDragEnabled(isEdge && !shouldBlockPageSwipe(e.target));
-    },
-    [shouldBlockPageSwipe],
-  );
-
-  const onPointerUp = useCallback(() => {
-    setDragEnabled(false);
-  }, []);
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     if (currentIndex === -1) return;
 
-    // Only trigger if gesture began from the edge.
-    const startedFromEdge =
-      startXRef.current <= SWIPE_EDGE_PX ||
-      startXRef.current >= (window.innerWidth || 0) - SWIPE_EDGE_PX;
-    if (!startedFromEdge) return;
-
-    const threshold = 90;
+    const threshold = 50;
     const velocity = info.velocity.x;
     const offset = info.offset.x;
 
-    if (Math.abs(offset) > threshold || Math.abs(velocity) > 800) {
-      if (offset > 0 || velocity > 800) {
+    if (Math.abs(offset) > threshold || Math.abs(velocity) > 500) {
+      if (offset > 0 || velocity > 500) {
         // Swipe right - go to previous page
         if (currentIndex > 0) {
           setDirection(-1);
@@ -114,18 +66,7 @@ export function SwipeableNavigation({ children }: SwipeableNavigationProps) {
   };
 
   return (
-    <div
-      className="relative min-h-screen"
-      onPointerDown={(e) => {
-        startXRef.current = e.clientX;
-        const isEdge =
-          e.clientX <= SWIPE_EDGE_PX ||
-          e.clientX >= window.innerWidth - SWIPE_EDGE_PX;
-        setDragEnabled(isEdge && !shouldBlockPageSwipe(e.target));
-      }}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
+    <div className="relative overflow-hidden min-h-screen">
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div
           key={location.pathname}
@@ -138,17 +79,11 @@ export function SwipeableNavigation({ children }: SwipeableNavigationProps) {
             x: { type: "spring", stiffness: 300, damping: 30 },
             opacity: { duration: 0.2 },
           }}
-          {...(dragEnabled
-            ? {
-                drag: "x" as const,
-                dragDirectionLock: true,
-                dragConstraints: { left: 0, right: 0 },
-                dragElastic: 0.2,
-                dragMomentum: false,
-                onDragEnd: handleDragEnd,
-              }
-            : {})}
-          className="min-h-screen"
+          drag="x"
+          dragConstraints={{ left: 0, right: 0 }}
+          dragElastic={0.2}
+          onDragEnd={handleDragEnd}
+          className="absolute inset-0 touch-pan-y"
         >
           {children}
         </motion.div>
