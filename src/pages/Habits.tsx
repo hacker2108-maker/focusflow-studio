@@ -1,37 +1,23 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Target, MoreVertical, Archive, Trash2, Edit, Flame, X } from "lucide-react";
+import { Plus, Target, MoreVertical, Archive, Trash2, Edit, Flame, TrendingUp } from "lucide-react";
 import { useHabitStore } from "@/store/habitStore";
-import { isHabitDueToday, getToday, getScheduleLabel, calculateStreak } from "@/lib/utils";
+import { isHabitDueToday, getToday, getScheduleLabel, calculateStreak, calculateCompletionRate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Progress } from "@/components/ui/progress";
 import { HABIT_COLORS, DAY_NAMES, type HabitFilter, type Habit } from "@/types";
 import { toast } from "sonner";
+import { HabitFormDialog, type HabitFormData } from "@/components/habits/HabitFormDialog";
 
 export default function Habits() {
   const { habits, logs, filter, setFilter, addHabit, updateHabit, deleteHabit, archiveHabit, unarchiveHabit, logHabit } = useHabitStore();
   const [isOpen, setIsOpen] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [detailHabit, setDetailHabit] = useState<Habit | null>(null);
-  
-  // Form state
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [scheduleType, setScheduleType] = useState<"daily" | "weekdays" | "customDays" | "timesPerWeek">("daily");
-  const [customDays, setCustomDays] = useState<number[]>([1, 2, 3, 4, 5]);
-  const [timesPerWeek, setTimesPerWeek] = useState(3);
-  const [color, setColor] = useState<string>(HABIT_COLORS[0]);
-  const [goalType, setGoalType] = useState<"check" | "count">("check");
-  const [goalTarget, setGoalTarget] = useState(1);
   
   const today = getToday();
 
@@ -44,45 +30,19 @@ export default function Habits() {
     }
   });
 
-  const resetForm = () => {
-    setName("");
-    setDescription("");
-    setScheduleType("daily");
-    setCustomDays([1, 2, 3, 4, 5]);
-    setTimesPerWeek(3);
-    setColor(HABIT_COLORS[0]);
-    setGoalType("check");
-    setGoalTarget(1);
-    setEditingHabit(null);
-  };
-
   const openEdit = (habit: Habit) => {
     setEditingHabit(habit);
-    setName(habit.name);
-    setDescription(habit.description || "");
-    setScheduleType(habit.schedule.type);
-    setCustomDays(habit.schedule.daysOfWeek || [1, 2, 3, 4, 5]);
-    setTimesPerWeek(habit.schedule.timesPerWeek || 3);
-    setColor(habit.color || HABIT_COLORS[0]);
-    setGoalType(habit.goalType);
-    setGoalTarget(habit.goalTarget || 1);
     setIsOpen(true);
   };
 
-  const handleSave = () => {
-    if (!name.trim()) return;
-    
+  const handleSave = (data: HabitFormData) => {
     const habitData = {
-      name: name.trim(),
-      description: description.trim() || undefined,
-      color,
-      schedule: {
-        type: scheduleType,
-        daysOfWeek: scheduleType === "customDays" ? customDays : undefined,
-        timesPerWeek: scheduleType === "timesPerWeek" ? timesPerWeek : undefined,
-      },
-      goalType,
-      goalTarget: goalType === "count" ? goalTarget : undefined,
+      name: data.name,
+      description: data.description,
+      color: data.color,
+      schedule: data.schedule,
+      goalType: data.goalType,
+      goalTarget: data.goalTarget,
     };
 
     if (editingHabit) {
@@ -91,12 +51,10 @@ export default function Habits() {
     } else {
       addHabit(habitData);
       toast.success("Habit created");
-      // Switch to active filter so user can see the new habit
       setFilter("active");
     }
     
-    resetForm();
-    setIsOpen(false);
+    setEditingHabit(null);
   };
 
   const handleDelete = (id: string) => {
@@ -106,12 +64,9 @@ export default function Habits() {
     }
   };
 
-  const toggleCustomDay = (day: number) => {
-    setCustomDays(prev => 
-      prev.includes(day) 
-        ? prev.filter(d => d !== day)
-        : [...prev, day].sort()
-    );
+  const handleOpenChange = (open: boolean) => {
+    setIsOpen(open);
+    if (!open) setEditingHabit(null);
   };
 
   // Detail view data
@@ -132,132 +87,22 @@ export default function Habits() {
           <h1 className="text-display-sm">Habits</h1>
           <p className="text-muted-foreground mt-1">Build consistent routines</p>
         </div>
-        <Dialog open={isOpen} onOpenChange={(open) => { setIsOpen(open); if (!open) resetForm(); }}>
-          <DialogTrigger asChild>
-            <Button className="gradient-primary text-primary-foreground shadow-glow">
-              <Plus className="w-4 h-4 mr-2" />
-              New Habit
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="glass-strong max-h-[85vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>{editingHabit ? "Edit Habit" : "Create Habit"}</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 mt-4">
-              <div>
-                <Label>Name *</Label>
-                <Input 
-                  value={name} 
-                  onChange={e => setName(e.target.value)} 
-                  placeholder="e.g., Exercise" 
-                  className="mt-1.5" 
-                />
-              </div>
-              
-              <div>
-                <Label>Description</Label>
-                <Textarea 
-                  value={description} 
-                  onChange={e => setDescription(e.target.value)} 
-                  placeholder="Optional details..." 
-                  className="mt-1.5 min-h-[60px]" 
-                />
-              </div>
-
-              <div>
-                <Label>Schedule</Label>
-                <Select value={scheduleType} onValueChange={(v: any) => setScheduleType(v)}>
-                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">Every day</SelectItem>
-                    <SelectItem value="weekdays">Weekdays only</SelectItem>
-                    <SelectItem value="customDays">Custom days</SelectItem>
-                    <SelectItem value="timesPerWeek">Times per week</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {scheduleType === "customDays" && (
-                <div className="flex flex-wrap gap-2">
-                  {DAY_NAMES.map((day, i) => (
-                    <button
-                      key={day}
-                      type="button"
-                      onClick={() => toggleCustomDay(i)}
-                      className={`w-10 h-10 rounded-lg text-sm font-medium transition-colors ${
-                        customDays.includes(i) 
-                          ? "gradient-primary text-primary-foreground" 
-                          : "bg-secondary text-muted-foreground hover:text-foreground"
-                      }`}
-                    >
-                      {day}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {scheduleType === "timesPerWeek" && (
-                <div>
-                  <Label>Times per week</Label>
-                  <Select value={timesPerWeek.toString()} onValueChange={v => setTimesPerWeek(parseInt(v))}>
-                    <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7].map(n => (
-                        <SelectItem key={n} value={n.toString()}>{n}× per week</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              <div>
-                <Label>Goal Type</Label>
-                <Select value={goalType} onValueChange={(v: any) => setGoalType(v)}>
-                  <SelectTrigger className="mt-1.5"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="check">Check off (done/not done)</SelectItem>
-                    <SelectItem value="count">Count (track a number)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {goalType === "count" && (
-                <div>
-                  <Label>Daily target</Label>
-                  <Input 
-                    type="number" 
-                    min={1} 
-                    value={goalTarget} 
-                    onChange={e => setGoalTarget(parseInt(e.target.value) || 1)} 
-                    className="mt-1.5" 
-                  />
-                </div>
-              )}
-
-              <div>
-                <Label>Color</Label>
-                <div className="flex gap-2 mt-1.5">
-                  {HABIT_COLORS.map(c => (
-                    <button
-                      key={c}
-                      type="button"
-                      onClick={() => setColor(c)}
-                      className={`w-8 h-8 rounded-full transition-transform ${
-                        color === c ? "scale-110 ring-2 ring-offset-2 ring-offset-background ring-primary" : ""
-                      }`}
-                      style={{ backgroundColor: c }}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <Button onClick={handleSave} className="w-full gradient-primary text-primary-foreground">
-                {editingHabit ? "Save Changes" : "Create Habit"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        <Button 
+          onClick={() => setIsOpen(true)}
+          className="gradient-primary text-primary-foreground shadow-glow"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          New Habit
+        </Button>
       </header>
+
+      {/* Habit Form Dialog */}
+      <HabitFormDialog
+        open={isOpen}
+        onOpenChange={handleOpenChange}
+        editingHabit={editingHabit}
+        onSave={handleSave}
+      />
 
       <Tabs value={filter} onValueChange={v => setFilter(v as HabitFilter)}>
         <TabsList className="glass">
@@ -288,11 +133,20 @@ export default function Habits() {
             </CardContent>
           </Card>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-3">
             {filteredHabits.map((habit, i) => {
               const log = logs.find(l => l.habitId === habit.id && l.date === today);
               const isDone = log?.status === "done";
               const streak = calculateStreak(habit, logs);
+              const weeklyRate = calculateCompletionRate(habit, logs, 7);
+
+              // Get last 7 days completion status
+              const last7Days = Array.from({ length: 7 }, (_, idx) => {
+                const date = new Date();
+                date.setDate(date.getDate() - (6 - idx));
+                const dateStr = date.toISOString().split('T')[0];
+                return logs.some(l => l.habitId === habit.id && l.date === dateStr && l.status === "done");
+              });
 
               return (
                 <motion.div
@@ -304,68 +158,121 @@ export default function Habits() {
                   transition={{ delay: i * 0.03 }}
                 >
                   <Card 
-                    className={`glass hover-lift cursor-pointer ${isDone ? "border-success/30" : ""}`}
+                    className={`glass hover-lift cursor-pointer overflow-hidden ${isDone ? "border-success/30" : ""}`}
                     onClick={() => setDetailHabit(habit)}
                   >
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <div 
-                        className="w-4 h-4 rounded-full flex-shrink-0" 
-                        style={{ backgroundColor: habit.color || "hsl(var(--primary))" }} 
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className={`font-medium truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
-                          {habit.name}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span>{getScheduleLabel(habit)}</span>
-                          {streak.current > 0 && (
-                            <span className="flex items-center gap-1 text-primary">
-                              <Flame className="w-3 h-3" />
-                              {streak.current}
-                            </span>
+                    <CardContent className="p-0">
+                      {/* Main content */}
+                      <div className="p-4 flex items-center gap-4">
+                        {/* Icon/Color indicator */}
+                        <div 
+                          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform"
+                          style={{ backgroundColor: (habit.color || "hsl(var(--primary))") + "20" }}
+                        >
+                          {isDone ? (
+                            <motion.div
+                              initial={{ scale: 0 }}
+                              animate={{ scale: 1 }}
+                              className="w-6 h-6 rounded-full flex items-center justify-center"
+                              style={{ backgroundColor: habit.color || "hsl(var(--primary))" }}
+                            >
+                              <span className="text-white text-sm">✓</span>
+                            </motion.div>
+                          ) : (
+                            <Flame className="w-5 h-5" style={{ color: habit.color || "hsl(var(--primary))" }} />
                           )}
                         </div>
-                      </div>
-                      {!habit.archived && (
-                        <Button
-                          size="sm"
-                          variant={isDone ? "secondary" : "default"}
-                          className={isDone ? "" : "gradient-primary text-primary-foreground"}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            logHabit(habit.id, isDone ? "skipped" : "done");
-                          }}
-                        >
-                          {isDone ? "✓" : "Done"}
-                        </Button>
-                      )}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(habit); }}>
-                            <Edit className="w-4 h-4 mr-2" />Edit
-                          </DropdownMenuItem>
-                          {habit.archived ? (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); unarchiveHabit(habit.id); }}>
-                              <Archive className="w-4 h-4 mr-2" />Unarchive
-                            </DropdownMenuItem>
-                          ) : (
-                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); archiveHabit(habit.id); }}>
-                              <Archive className="w-4 h-4 mr-2" />Archive
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem 
-                            onClick={(e) => { e.stopPropagation(); handleDelete(habit.id); }} 
-                            className="text-destructive"
+
+                        {/* Info */}
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-semibold truncate ${isDone ? "line-through text-muted-foreground" : ""}`}>
+                            {habit.name}
+                          </p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <span className="text-xs text-muted-foreground">{getScheduleLabel(habit)}</span>
+                            {streak.current > 0 && (
+                              <span 
+                                className="flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full"
+                                style={{ 
+                                  backgroundColor: (habit.color || "hsl(var(--primary))") + "20",
+                                  color: habit.color || "hsl(var(--primary))"
+                                }}
+                              >
+                                <Flame className="w-3 h-3" />
+                                {streak.current} day{streak.current !== 1 ? "s" : ""}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Actions */}
+                        {!habit.archived && (
+                          <motion.button
+                            whileHover={{ scale: 1.05 }}
+                            whileTap={{ scale: 0.95 }}
+                            className={`h-10 px-4 rounded-xl font-medium text-sm transition-all ${
+                              isDone 
+                                ? "bg-success/20 text-success" 
+                                : "text-primary-foreground shadow-glow"
+                            }`}
+                            style={!isDone ? { background: `var(--gradient-primary)` } : {}}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              logHabit(habit.id, isDone ? "skipped" : "done");
+                            }}
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                            {isDone ? "Done ✓" : "Mark Done"}
+                          </motion.button>
+                        )}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreVertical className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(habit); }}>
+                              <Edit className="w-4 h-4 mr-2" />Edit
+                            </DropdownMenuItem>
+                            {habit.archived ? (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); unarchiveHabit(habit.id); }}>
+                                <Archive className="w-4 h-4 mr-2" />Unarchive
+                              </DropdownMenuItem>
+                            ) : (
+                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); archiveHabit(habit.id); }}>
+                                <Archive className="w-4 h-4 mr-2" />Archive
+                              </DropdownMenuItem>
+                            )}
+                            <DropdownMenuItem 
+                              onClick={(e) => { e.stopPropagation(); handleDelete(habit.id); }} 
+                              className="text-destructive"
+                            >
+                              <Trash2 className="w-4 h-4 mr-2" />Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+
+                      {/* Weekly progress bar */}
+                      <div className="px-4 pb-3">
+                        <div className="flex items-center gap-1">
+                          {last7Days.map((completed, idx) => (
+                            <div 
+                              key={idx}
+                              className={`flex-1 h-1.5 rounded-full transition-all ${
+                                completed ? "" : "bg-secondary"
+                              }`}
+                              style={completed ? { backgroundColor: habit.color || "hsl(var(--primary))" } : {}}
+                            />
+                          ))}
+                        </div>
+                        <div className="flex justify-between mt-1.5">
+                          <span className="text-2xs text-muted-foreground">Last 7 days</span>
+                          <span className="text-2xs font-medium" style={{ color: habit.color || "hsl(var(--primary))" }}>
+                            {weeklyRate}% complete
+                          </span>
+                        </div>
+                      </div>
                     </CardContent>
                   </Card>
                 </motion.div>
