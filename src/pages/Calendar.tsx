@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
-import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addDays } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, addMonths, subMonths, startOfWeek, endOfWeek, addDays, addWeeks, addYears } from "date-fns";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, ChevronLeft, ChevronRight, Clock, Trash2, Edit3, Bell, BellOff } from "lucide-react";
+import { Plus, ChevronLeft, ChevronRight, Clock, Trash2, Edit3, Bell, Repeat } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -22,6 +22,14 @@ const REMINDER_OPTIONS = [
   { value: 1440, label: "1 day before" },
 ];
 
+const RECURRENCE_OPTIONS = [
+  { value: "none", label: "No repeat" },
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "yearly", label: "Yearly" },
+];
+
 export default function Calendar() {
   const { events, addEvent, updateEvent, deleteEvent, getEventsByDate } = useCalendarStore();
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -38,6 +46,8 @@ export default function Calendar() {
   const [endTime, setEndTime] = useState("10:00");
   const [color, setColor] = useState<string>(EVENT_COLORS[0]);
   const [reminder, setReminder] = useState<number | undefined>(undefined);
+  const [recurrenceType, setRecurrenceType] = useState<string>("none");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   
   useEffect(() => {
     checkNotificationPermission();
@@ -63,13 +73,61 @@ export default function Calendar() {
   const weekStart = startOfWeek(currentDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
   
-  const selectedDateEvents = useMemo(() => {
-    return getEventsByDate(selectedDate);
-  }, [events, selectedDate, getEventsByDate]);
+  // Generate recurring events for display
+  const getEventsWithRecurring = useMemo(() => {
+    const allEvents: CalendarEvent[] = [];
+    const displayStart = calendarStart;
+    const displayEnd = addMonths(calendarEnd, 1);
+    
+    events.forEach(event => {
+      allEvents.push(event);
+      
+      // Generate recurring instances
+      if (event.isRecurring && event.recurrenceType) {
+        let currentEventDate = parseISO(event.date);
+        const endDate = event.recurrenceEndDate ? parseISO(event.recurrenceEndDate) : displayEnd;
+        
+        for (let i = 0; i < 100; i++) { // Limit iterations
+          switch (event.recurrenceType) {
+            case "daily":
+              currentEventDate = addDays(currentEventDate, 1);
+              break;
+            case "weekly":
+              currentEventDate = addWeeks(currentEventDate, 1);
+              break;
+            case "monthly":
+              currentEventDate = addMonths(currentEventDate, 1);
+              break;
+            case "yearly":
+              currentEventDate = addYears(currentEventDate, 1);
+              break;
+          }
+          
+          if (currentEventDate > endDate || currentEventDate > displayEnd) break;
+          
+          allEvents.push({
+            ...event,
+            id: `${event.id}-${format(currentEventDate, "yyyy-MM-dd")}`,
+            date: format(currentEventDate, "yyyy-MM-dd"),
+            parentEventId: event.id,
+          });
+        }
+      }
+    });
+    
+    return allEvents;
+  }, [events, calendarStart, calendarEnd]);
   
   const getEventsForDay = (day: Date) => {
-    return getEventsByDate(format(day, "yyyy-MM-dd"));
+    const dateStr = format(day, "yyyy-MM-dd");
+    return getEventsWithRecurring.filter(e => e.date === dateStr)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
   };
+  
+  const selectedDateEvents = useMemo(() => {
+    return getEventsWithRecurring.filter(e => e.date === selectedDate)
+      .sort((a, b) => a.startTime.localeCompare(b.startTime));
+  }, [getEventsWithRecurring, selectedDate]);
   
   const handlePrevMonth = () => setCurrentDate(subMonths(currentDate, 1));
   const handleNextMonth = () => setCurrentDate(addMonths(currentDate, 1));
@@ -87,23 +145,34 @@ export default function Calendar() {
     setEndTime("10:00");
     setColor(EVENT_COLORS[0]);
     setReminder(undefined);
+    setRecurrenceType("none");
+    setRecurrenceEndDate("");
     setEditingEvent(null);
     setIsEditing(true);
   };
   
   const handleEditEvent = (event: CalendarEvent) => {
-    setTitle(event.title);
-    setDescription(event.description || "");
-    setStartTime(event.startTime);
-    setEndTime(event.endTime);
-    setColor(event.color);
-    setReminder(event.reminder);
-    setEditingEvent(event);
+    // Find the original event if this is a recurring instance
+    const originalEvent = event.parentEventId 
+      ? events.find(e => e.id === event.parentEventId) || event
+      : event;
+      
+    setTitle(originalEvent.title);
+    setDescription(originalEvent.description || "");
+    setStartTime(originalEvent.startTime);
+    setEndTime(originalEvent.endTime);
+    setColor(originalEvent.color);
+    setReminder(originalEvent.reminder);
+    setRecurrenceType(originalEvent.recurrenceType || "none");
+    setRecurrenceEndDate(originalEvent.recurrenceEndDate || "");
+    setEditingEvent(originalEvent);
     setIsEditing(true);
   };
   
   const handleSave = async () => {
     if (!title.trim()) return;
+    
+    const isRecurring = recurrenceType !== "none";
     
     const eventData = {
       title,
@@ -113,16 +182,17 @@ export default function Calendar() {
       endTime,
       color,
       reminder,
+      isRecurring,
+      recurrenceType: isRecurring ? recurrenceType : undefined,
+      recurrenceEndDate: isRecurring && recurrenceEndDate ? recurrenceEndDate : undefined,
     };
     
     if (editingEvent) {
-      // Cancel old notification if existed
       if (editingEvent.notificationId) {
         await cancelNotification(editingEvent.notificationId);
       }
       updateEvent(editingEvent.id, eventData);
       
-      // Schedule new notification if reminder set
       if (reminder !== undefined && notificationsEnabled) {
         const notificationId = Date.now();
         const eventDateTime = new Date(`${selectedDate}T${startTime}`);
@@ -139,7 +209,6 @@ export default function Calendar() {
     } else {
       const newEvent = addEvent(eventData);
       
-      // Schedule notification if reminder set
       if (reminder !== undefined && notificationsEnabled) {
         const notificationId = Date.now();
         const eventDateTime = new Date(`${selectedDate}T${startTime}`);
@@ -160,10 +229,16 @@ export default function Calendar() {
   };
   
   const handleDeleteEvent = async (event: CalendarEvent) => {
-    if (event.notificationId) {
-      await cancelNotification(event.notificationId);
+    const eventToDelete = event.parentEventId 
+      ? events.find(e => e.id === event.parentEventId)
+      : event;
+      
+    if (eventToDelete) {
+      if (eventToDelete.notificationId) {
+        await cancelNotification(eventToDelete.notificationId);
+      }
+      deleteEvent(eventToDelete.id);
     }
-    deleteEvent(event.id);
   };
   
   const renderMonthView = () => (
@@ -205,10 +280,11 @@ export default function Calendar() {
                 {dayEvents.slice(0, 2).map((event) => (
                   <div
                     key={event.id}
-                    className="text-[10px] sm:text-xs truncate px-1 py-0.5 rounded"
+                    className="text-[10px] sm:text-xs truncate px-1 py-0.5 rounded flex items-center gap-1"
                     style={{ backgroundColor: event.color + "30", color: event.color }}
                   >
-                    {event.title}
+                    {event.isRecurring && <Repeat className="w-2 h-2 flex-shrink-0" />}
+                    <span className="truncate">{event.title}</span>
                   </div>
                 ))}
                 {dayEvents.length > 2 && (
@@ -254,9 +330,10 @@ export default function Calendar() {
                 {dayEvents.slice(0, 3).map((event) => (
                   <div
                     key={event.id}
-                    className="text-[10px] truncate px-1.5 py-0.5 rounded"
+                    className="text-[10px] truncate px-1.5 py-0.5 rounded flex items-center gap-1"
                     style={{ backgroundColor: event.color + "30", color: event.color }}
                   >
+                    {event.isRecurring && <Repeat className="w-2 h-2 flex-shrink-0" />}
                     {event.startTime} {event.title}
                   </div>
                 ))}
@@ -351,7 +428,12 @@ export default function Calendar() {
                     style={{ backgroundColor: event.color }}
                   />
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium">{event.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium">{event.title}</p>
+                      {event.isRecurring && (
+                        <Repeat className="w-3 h-3 text-muted-foreground" />
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
                       <Clock className="w-3 h-3" />
                       <span>{event.startTime} - {event.endTime}</span>
@@ -445,6 +527,36 @@ export default function Calendar() {
                 ))}
               </div>
             </div>
+            
+            <div>
+              <label className="text-sm font-medium mb-2 block">Repeat</label>
+              <Select
+                value={recurrenceType}
+                onValueChange={setRecurrenceType}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="No repeat" />
+                </SelectTrigger>
+                <SelectContent>
+                  {RECURRENCE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {recurrenceType !== "none" && (
+              <div>
+                <label className="text-sm font-medium mb-2 block">Repeat Until (optional)</label>
+                <Input
+                  type="date"
+                  value={recurrenceEndDate}
+                  onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                />
+              </div>
+            )}
             
             <div>
               <label className="text-sm font-medium mb-2 block">Reminder</label>

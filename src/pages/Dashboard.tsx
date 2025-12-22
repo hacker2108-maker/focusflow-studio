@@ -1,15 +1,18 @@
 import { motion } from "framer-motion";
-import { Plus, Target, Timer, Flame, CheckCircle2 } from "lucide-react";
+import { Plus, Target, Timer, Flame, CheckCircle2, CalendarDays, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
-import { isHabitDueToday, getToday, calculateStreak, formatMinutes } from "@/lib/utils";
+import { useCalendarStore } from "@/store/calendarStore";
+import { isHabitDueToday, getToday, calculateStreak, formatMinutes, formatDate } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { WeatherWidget } from "@/components/WeatherWidget";
 
 export default function Dashboard() {
   const { habits, logs, logHabit } = useHabitStore();
   const { sessions } = useFocusStore();
+  const { events } = useCalendarStore();
   const today = getToday();
 
   const todayHabits = habits.filter(h => !h.archived && isHabitDueToday(h));
@@ -19,6 +22,8 @@ export default function Dashboard() {
 
   const todaySessions = sessions.filter(s => s.date === today);
   const todayFocusMinutes = todaySessions.reduce((acc, s) => acc + s.durationMinutes, 0);
+  
+  const todayEvents = events.filter(e => e.date === today).slice(0, 3);
 
   const bestStreak = habits.reduce((best, h) => {
     const streak = calculateStreak(h, logs);
@@ -31,10 +36,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 animate-fade-in">
-      <header>
-        <h1 className="text-display-sm text-foreground">Dashboard</h1>
-        <p className="text-muted-foreground mt-1">Track your progress today</p>
+      <header className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-display-sm text-foreground">Dashboard</h1>
+          <p className="text-muted-foreground mt-1">{formatDate(new Date(), "EEEE, MMMM d")}</p>
+        </div>
       </header>
+
+      {/* Weather Widget */}
+      <WeatherWidget />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -44,23 +54,58 @@ export default function Dashboard() {
         <StatCard icon={Timer} label="Focus" value={formatMinutes(todayFocusMinutes)} color="text-primary" />
       </div>
 
-      {/* Quick Focus */}
-      <Card className="glass border-primary/20 overflow-hidden">
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-foreground">Start Focus Session</h3>
-              <p className="text-sm text-muted-foreground mt-1">25 min Pomodoro or Deep Focus</p>
+      {/* Today's Events */}
+      {todayEvents.length > 0 && (
+        <Card className="glass border-primary/20">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold flex items-center gap-2">
+                <CalendarDays className="w-4 h-4 text-primary" />
+                Today's Schedule
+              </h3>
+              <Link to="/calendar">
+                <Button variant="ghost" size="sm">View all</Button>
+              </Link>
             </div>
-            <Link to="/focus">
-              <Button className="gradient-primary text-primary-foreground shadow-glow">
-                <Timer className="w-4 h-4 mr-2" />
-                Start
-              </Button>
-            </Link>
-          </div>
-        </CardContent>
-      </Card>
+            <div className="space-y-2">
+              {todayEvents.map(event => (
+                <div key={event.id} className="flex items-center gap-3 p-2 rounded-lg bg-secondary/50">
+                  <div 
+                    className="w-1 h-8 rounded-full" 
+                    style={{ backgroundColor: event.color }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{event.title}</p>
+                    <p className="text-xs text-muted-foreground">{event.startTime} - {event.endTime}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-2 gap-3">
+        <Link to="/focus">
+          <Card className="glass border-primary/20 hover:border-primary/40 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
+              <Timer className="w-8 h-8 text-primary mb-2" />
+              <p className="font-semibold">Start Focus</p>
+              <p className="text-xs text-muted-foreground">25 min Pomodoro</p>
+            </CardContent>
+          </Card>
+        </Link>
+        <Link to="/journal">
+          <Card className="glass hover:border-primary/20 transition-colors cursor-pointer h-full">
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
+              <BookOpen className="w-8 h-8 text-primary mb-2" />
+              <p className="font-semibold">Write Journal</p>
+              <p className="text-xs text-muted-foreground">Capture thoughts</p>
+            </CardContent>
+          </Card>
+        </Link>
+      </div>
 
       {/* Today's Habits */}
       <section>

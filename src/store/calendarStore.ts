@@ -11,6 +11,11 @@ export interface CalendarEvent {
   color: string;
   reminder?: number; // minutes before
   notificationId?: number;
+  isRecurring?: boolean;
+  recurrenceType?: string; // 'daily', 'weekly', 'monthly', 'yearly'
+  recurrenceInterval?: number;
+  recurrenceEndDate?: string;
+  parentEventId?: string;
   createdAt: number;
 }
 
@@ -21,6 +26,7 @@ interface CalendarState {
   deleteEvent: (id: string) => void;
   getEventsByDate: (date: string) => CalendarEvent[];
   getEventsForMonth: (year: number, month: number) => CalendarEvent[];
+  clearAllData: () => void;
 }
 
 export const EVENT_COLORS = [
@@ -73,6 +79,10 @@ export const useCalendarStore = create<CalendarState>()(
       getEventsForMonth: (year, month) => {
         const monthStr = `${year}-${String(month + 1).padStart(2, "0")}`;
         return get().events.filter((event) => event.date.startsWith(monthStr));
+      },
+      
+      clearAllData: () => {
+        set({ events: [] });
       },
     }),
     {

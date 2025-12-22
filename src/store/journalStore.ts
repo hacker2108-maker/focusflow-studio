@@ -18,6 +18,10 @@ interface JournalState {
   updateEntry: (id: string, updates: Partial<JournalEntry>) => void;
   deleteEntry: (id: string) => void;
   getEntryByDate: (date: string) => JournalEntry | undefined;
+  clearAllData: () => void;
+}
+  deleteEntry: (id: string) => void;
+  getEntryByDate: (date: string) => JournalEntry | undefined;
 }
 
 export const useJournalStore = create<JournalState>()(
@@ -56,6 +60,10 @@ export const useJournalStore = create<JournalState>()(
       
       getEntryByDate: (date) => {
         return get().entries.find((entry) => entry.date === date);
+      },
+      
+      clearAllData: () => {
+        set({ entries: [] });
       },
     }),
     {
