@@ -12,6 +12,12 @@ import {
   FileText,
   PinOff,
   Palette,
+  FolderPlus,
+  Download,
+  Share2,
+  Copy,
+  FolderOpen,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,11 +29,22 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
 } from "@/components/ui/dropdown-menu";
-import { useNotesStore, type Note } from "@/store/notesStore";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { useNotesStore, type Note, DEFAULT_FOLDERS } from "@/store/notesStore";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { exportNoteToPdf, shareNote, copyNoteToClipboard } from "@/lib/exportPdf";
 
 const noteColors = [
   { name: "Default", value: "#FFFFFF" },
@@ -39,9 +56,19 @@ const noteColors = [
   { name: "Orange", value: "#FED7AA" },
 ];
 
+const folderIcons: Record<string, string> = {
+  Notes: "📝",
+  Work: "💼",
+  Personal: "👤",
+  Ideas: "💡",
+  Archive: "📦",
+};
+
 export default function Notes() {
   const {
     notes,
+    folders,
+    selectedFolder,
     isLoading,
     selectedNote,
     fetchNotes,
@@ -50,14 +77,20 @@ export default function Notes() {
     deleteNote,
     setSelectedNote,
     togglePin,
+    setSelectedFolder,
+    addFolder,
+    deleteFolder,
+    moveToFolder,
   } = useNotesStore();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
+  const [showFolderDialog, setShowFolderDialog] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
+  const [showFolderSidebar, setShowFolderSidebar] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
-  const contentRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     fetchNotes();
@@ -85,7 +118,7 @@ export default function Notes() {
   }, [editTitle, editContent, selectedNote, isEditing, updateNote]);
 
   const handleCreateNote = async () => {
-    const newNote = await addNote({ title: "Untitled", content: "" });
+    const newNote = await addNote({ title: "Untitled", content: "", folder: selectedFolder || "Notes" });
     if (newNote) {
       setSelectedNote(newNote);
       setIsEditing(true);
@@ -113,14 +146,68 @@ export default function Notes() {
     }
   };
 
-  const filteredNotes = notes.filter(
-    (note) =>
+  const handleCreateFolder = () => {
+    if (newFolderName.trim()) {
+      addFolder(newFolderName.trim());
+      toast.success(`Folder "${newFolderName}" created`);
+      setNewFolderName("");
+      setShowFolderDialog(false);
+    }
+  };
+
+  const handleExportPdf = async () => {
+    if (!selectedNote) return;
+    try {
+      await exportNoteToPdf(selectedNote);
+      toast.success("PDF export started");
+    } catch (error) {
+      toast.error("Failed to export PDF");
+    }
+  };
+
+  const handleShare = async () => {
+    if (!selectedNote) return;
+    try {
+      await shareNote(selectedNote);
+      toast.success("Note shared");
+    } catch {
+      // Fallback already handled in shareNote
+      try {
+        await copyNoteToClipboard(selectedNote);
+        toast.success("Note copied to clipboard");
+      } catch {
+        toast.error("Failed to share note");
+      }
+    }
+  };
+
+  const handleCopy = async () => {
+    if (!selectedNote) return;
+    try {
+      await copyNoteToClipboard(selectedNote);
+      toast.success("Copied to clipboard");
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  // Filter notes by folder and search
+  const filteredNotes = notes.filter((note) => {
+    const matchesFolder = !selectedFolder || note.folder === selectedFolder;
+    const matchesSearch =
       note.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      note.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      note.content.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFolder && matchesSearch;
+  });
 
   const pinnedNotes = filteredNotes.filter((note) => note.isPinned);
   const unpinnedNotes = filteredNotes.filter((note) => !note.isPinned);
+
+  // Get note counts per folder
+  const folderCounts = folders.reduce((acc, folder) => {
+    acc[folder] = notes.filter((n) => n.folder === folder).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   // Determine if we should show mobile editor view
   const showMobileEditor = selectedNote && isEditing;
@@ -156,6 +243,27 @@ export default function Notes() {
                 </Button>
 
                 <div className="flex items-center gap-1">
+                  {/* Folder selector */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Folder className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      {folders.map((folder) => (
+                        <DropdownMenuItem
+                          key={folder}
+                          onClick={() => moveToFolder(selectedNote.id, folder)}
+                          className={cn(selectedNote.folder === folder && "bg-accent")}
+                        >
+                          <span className="mr-2">{folderIcons[folder] || "📁"}</span>
+                          {folder}
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">
@@ -178,6 +286,30 @@ export default function Notes() {
                           />
                         ))}
                       </div>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+
+                  {/* Share/Export menu */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon">
+                        <Share2 className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={handleShare}>
+                        <Share2 className="w-4 h-4 mr-2" />
+                        Share
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={handleCopy}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy to clipboard
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleExportPdf}>
+                        <Download className="w-4 h-4 mr-2" />
+                        Export as PDF
+                      </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
 
@@ -215,15 +347,20 @@ export default function Notes() {
                 className="text-xl font-semibold border-none bg-transparent p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50"
               />
 
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Clock className="w-3 h-3" />
-                <span>
-                  {formatDistanceToNow(selectedNote.updatedAt, { addSuffix: true })}
-                </span>
+              <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Clock className="w-3 h-3" />
+                  <span>
+                    {formatDistanceToNow(selectedNote.updatedAt, { addSuffix: true })}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Folder className="w-3 h-3" />
+                  <span>{selectedNote.folder}</span>
+                </div>
               </div>
 
               <Textarea
-                ref={contentRef}
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 placeholder="Start typing..."
@@ -247,17 +384,106 @@ export default function Notes() {
                   Notes
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  {notes.length} {notes.length === 1 ? "note" : "notes"}
+                  {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
+                  {selectedFolder && ` in ${selectedFolder}`}
                 </p>
               </div>
-              <Button
-                onClick={handleCreateNote}
-                size="icon"
-                className="rounded-full shadow-lg"
-              >
-                <Plus className="w-5 h-5" />
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setShowFolderSidebar(!showFolderSidebar)}
+                  className="md:hidden"
+                >
+                  <FolderOpen className="w-5 h-5" />
+                </Button>
+                <Button
+                  onClick={handleCreateNote}
+                  size="icon"
+                  className="rounded-full shadow-lg"
+                >
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </div>
             </header>
+
+            {/* Folder Sidebar (mobile slide-out) */}
+            <AnimatePresence>
+              {showFolderSidebar && (
+                <motion.div
+                  initial={{ x: "-100%" }}
+                  animate={{ x: 0 }}
+                  exit={{ x: "-100%" }}
+                  className="fixed inset-0 z-50 md:hidden"
+                >
+                  <div
+                    className="absolute inset-0 bg-black/50"
+                    onClick={() => setShowFolderSidebar(false)}
+                  />
+                  <motion.div
+                    initial={{ x: "-100%" }}
+                    animate={{ x: 0 }}
+                    exit={{ x: "-100%" }}
+                    className="absolute left-0 top-0 bottom-0 w-72 bg-background border-r border-border p-4"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="font-semibold">Folders</h2>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowFolderSidebar(false)}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                    <FolderList
+                      folders={folders}
+                      selectedFolder={selectedFolder}
+                      folderCounts={folderCounts}
+                      onSelectFolder={(folder) => {
+                        setSelectedFolder(folder);
+                        setShowFolderSidebar(false);
+                      }}
+                      onCreateFolder={() => setShowFolderDialog(true)}
+                      onDeleteFolder={deleteFolder}
+                    />
+                  </motion.div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Desktop folder tabs */}
+            <div className="hidden md:block">
+              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                <Button
+                  variant={selectedFolder === null ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setSelectedFolder(null)}
+                >
+                  All Notes
+                </Button>
+                {folders.map((folder) => (
+                  <Button
+                    key={folder}
+                    variant={selectedFolder === folder ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setSelectedFolder(folder)}
+                    className="gap-1"
+                  >
+                    <span>{folderIcons[folder] || "📁"}</span>
+                    {folder}
+                    <span className="text-xs opacity-60">({folderCounts[folder] || 0})</span>
+                  </Button>
+                ))}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowFolderDialog(true)}
+                >
+                  <FolderPlus className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
 
             {/* Search */}
             <div className="relative">
@@ -301,9 +527,13 @@ export default function Notes() {
                         <NoteCard
                           key={note.id}
                           note={note}
+                          folders={folders}
                           onClick={() => setSelectedNote(note)}
                           onDelete={() => handleDeleteNote(note)}
                           onTogglePin={() => togglePin(note.id)}
+                          onMoveToFolder={(folder) => moveToFolder(note.id, folder)}
+                          onExportPdf={() => exportNoteToPdf(note).then(() => toast.success("PDF export started"))}
+                          onCopy={() => copyNoteToClipboard(note).then(() => toast.success("Copied"))}
                         />
                       ))}
                     </div>
@@ -324,9 +554,13 @@ export default function Notes() {
                         <NoteCard
                           key={note.id}
                           note={note}
+                          folders={folders}
                           onClick={() => setSelectedNote(note)}
                           onDelete={() => handleDeleteNote(note)}
                           onTogglePin={() => togglePin(note.id)}
+                          onMoveToFolder={(folder) => moveToFolder(note.id, folder)}
+                          onExportPdf={() => exportNoteToPdf(note).then(() => toast.success("PDF export started"))}
+                          onCopy={() => copyNoteToClipboard(note).then(() => toast.success("Copied"))}
                         />
                       ))}
                     </div>
@@ -337,6 +571,103 @@ export default function Notes() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Create Folder Dialog */}
+      <Dialog open={showFolderDialog} onOpenChange={setShowFolderDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Folder</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newFolderName}
+            onChange={(e) => setNewFolderName(e.target.value)}
+            placeholder="Folder name"
+            onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFolderDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreateFolder}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+// Folder List Component
+function FolderList({
+  folders,
+  selectedFolder,
+  folderCounts,
+  onSelectFolder,
+  onCreateFolder,
+  onDeleteFolder,
+}: {
+  folders: string[];
+  selectedFolder: string | null;
+  folderCounts: Record<string, number>;
+  onSelectFolder: (folder: string | null) => void;
+  onCreateFolder: () => void;
+  onDeleteFolder: (folder: string) => void;
+}) {
+  return (
+    <div className="space-y-1">
+      <button
+        onClick={() => onSelectFolder(null)}
+        className={cn(
+          "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors",
+          selectedFolder === null ? "bg-primary/10 text-primary" : "hover:bg-secondary"
+        )}
+      >
+        <span className="flex items-center gap-2">
+          <span>📋</span>
+          All Notes
+        </span>
+        <span className="text-xs text-muted-foreground">
+          {Object.values(folderCounts).reduce((a, b) => a + b, 0)}
+        </span>
+      </button>
+
+      {folders.map((folder) => (
+        <div
+          key={folder}
+          className={cn(
+            "flex items-center justify-between px-3 py-2 rounded-lg transition-colors group",
+            selectedFolder === folder ? "bg-primary/10 text-primary" : "hover:bg-secondary"
+          )}
+        >
+          <button
+            onClick={() => onSelectFolder(folder)}
+            className="flex-1 flex items-center gap-2 text-left"
+          >
+            <span>{folderIcons[folder] || "📁"}</span>
+            {folder}
+          </button>
+          <div className="flex items-center gap-1">
+            <span className="text-xs text-muted-foreground">{folderCounts[folder] || 0}</span>
+            {!DEFAULT_FOLDERS.includes(folder) && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                onClick={() => onDeleteFolder(folder)}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            )}
+          </div>
+        </div>
+      ))}
+
+      <button
+        onClick={onCreateFolder}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-muted-foreground hover:bg-secondary transition-colors"
+      >
+        <FolderPlus className="w-4 h-4" />
+        New Folder
+      </button>
     </div>
   );
 }
@@ -344,14 +675,22 @@ export default function Notes() {
 // Note Card Component
 function NoteCard({
   note,
+  folders,
   onClick,
   onDelete,
   onTogglePin,
+  onMoveToFolder,
+  onExportPdf,
+  onCopy,
 }: {
   note: Note;
+  folders: string[];
   onClick: () => void;
   onDelete: () => void;
   onTogglePin: () => void;
+  onMoveToFolder: (folder: string) => void;
+  onExportPdf: () => void;
+  onCopy: () => void;
 }) {
   return (
     <motion.div
@@ -377,9 +716,14 @@ function NoteCard({
               <p className="text-sm text-muted-foreground line-clamp-2 mt-1">
                 {note.content || "No content"}
               </p>
-              <p className="text-xs text-muted-foreground mt-2">
-                {formatDistanceToNow(note.updatedAt, { addSuffix: true })}
-              </p>
+              <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1">
+                  <Folder className="w-3 h-3" />
+                  {note.folder}
+                </span>
+                <span>•</span>
+                <span>{formatDistanceToNow(note.updatedAt, { addSuffix: true })}</span>
+              </div>
             </div>
 
             <DropdownMenu>
@@ -407,7 +751,53 @@ function NoteCard({
                     </>
                   )}
                 </DropdownMenuItem>
+                
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger onClick={(e) => e.stopPropagation()}>
+                    <Folder className="w-4 h-4 mr-2" />
+                    Move to folder
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    {folders.map((folder) => (
+                      <DropdownMenuItem
+                        key={folder}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMoveToFolder(folder);
+                        }}
+                        className={cn(note.folder === folder && "bg-accent")}
+                      >
+                        <span className="mr-2">{folderIcons[folder] || "📁"}</span>
+                        {folder}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+
                 <DropdownMenuSeparator />
+
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCopy();
+                  }}
+                >
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onExportPdf();
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Export PDF
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator />
+
                 <DropdownMenuItem
                   onClick={(e) => {
                     e.stopPropagation();
