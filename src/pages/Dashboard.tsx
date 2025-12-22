@@ -1,3 +1,4 @@
+import { useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import { Plus, Target, Timer, Flame, CheckCircle2, CalendarDays, BookOpen } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -9,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { WeatherWidget } from "@/components/WeatherWidget";
 import { TimeWidget } from "@/components/TimeWidget";
+import { PullToRefresh } from "@/components/ui/pull-to-refresh";
+import { toast } from "sonner";
 
 
 export default function Dashboard() {
@@ -16,6 +19,14 @@ export default function Dashboard() {
   const { sessions } = useFocusStore();
   const { events } = useCalendarStore();
   const today = getToday();
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const handleRefresh = useCallback(async () => {
+    // Simulate refresh delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setRefreshKey(k => k + 1);
+    toast.success("Refreshed!");
+  }, []);
 
   const todayHabits = habits.filter(h => !h.archived && isHabitDueToday(h));
   const completedToday = todayHabits.filter(h => 
@@ -37,7 +48,8 @@ export default function Dashboard() {
     : 100;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <PullToRefresh onRefresh={handleRefresh}>
+    <div key={refreshKey} className="space-y-6 animate-fade-in pb-24">
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-display-sm text-foreground">Dashboard</h1>
@@ -176,6 +188,7 @@ export default function Dashboard() {
         )}
       </section>
     </div>
+    </PullToRefresh>
   );
 }
 
