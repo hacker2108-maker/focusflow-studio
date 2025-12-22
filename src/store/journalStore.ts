@@ -20,9 +20,6 @@ interface JournalState {
   getEntryByDate: (date: string) => JournalEntry | undefined;
   clearAllData: () => void;
 }
-  deleteEntry: (id: string) => void;
-  getEntryByDate: (date: string) => JournalEntry | undefined;
-}
 
 export const useJournalStore = create<JournalState>()(
   persist(
