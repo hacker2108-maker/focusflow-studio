@@ -16,10 +16,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useActivityStore, type Activity } from "@/store/activityStore";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { ActivityCharts } from "@/components/activity/ActivityCharts";
+import { NavigationCard } from "@/components/activity/NavigationCard";
+import { AchievementsBadges } from "@/components/activity/AchievementsBadges";
 
 const activityTypes = [
   { type: "run" as const, label: "Run", icon: Footprints, color: "#EF4444" },
@@ -56,6 +60,7 @@ export default function Activity() {
   const [selectedType, setSelectedType] = useState<Activity["type"]>("run");
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+  const [activeTab, setActiveTab] = useState("track");
 
   // Fetch activities from database on mount
   useEffect(() => {
@@ -149,211 +154,317 @@ export default function Activity() {
         <p className="text-muted-foreground mt-1">Track your runs, walks, and more</p>
       </header>
 
-      {/* Map */}
-      <Card className="glass overflow-hidden">
-        <div className="h-[300px] relative">
-          {mapUrl ? (
-            <iframe
-              src={mapUrl}
-              className="w-full h-full border-0"
-              title="Activity Map"
-              loading="lazy"
-            />
-          ) : (
-            <div className="h-full flex items-center justify-center bg-secondary">
-              <div className="text-center">
-                <MapPin className="w-8 h-8 mx-auto text-muted-foreground mb-2 animate-pulse" />
-                <p className="text-sm text-muted-foreground">Getting your location...</p>
-              </div>
-            </div>
-          )}
+      {/* Tab Navigation */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="track">Track</TabsTrigger>
+          <TabsTrigger value="navigate">Navigate</TabsTrigger>
+          <TabsTrigger value="stats">Stats</TabsTrigger>
+          <TabsTrigger value="achievements">Badges</TabsTrigger>
+        </TabsList>
 
-          {/* Current position indicator */}
-          {currentPosition && isTracking && (
-            <div className="absolute bottom-4 right-4 glass-strong rounded-xl px-3 py-2 flex items-center gap-2">
-              <Navigation className="w-4 h-4 text-primary animate-pulse" />
-              <span className="text-xs font-medium">
-                {currentPosition.lat.toFixed(4)}, {currentPosition.lng.toFixed(4)}
-              </span>
-            </div>
-          )}
-
-          {/* Overlay stats while tracking */}
-          {isTracking && (
-            <div className="absolute top-4 left-4 right-4 flex gap-2 flex-wrap">
-              <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
-                <Timer className="w-4 h-4 text-primary" />
-                <span className="font-mono font-bold">{formatDuration(elapsedTime)}</span>
-              </div>
-              <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
-                <Route className="w-4 h-4 text-primary" />
-                <span className="font-mono font-bold">{distanceKm.toFixed(2)} km</span>
-              </div>
-              <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                <span className="font-mono font-bold">{currentSpeed.toFixed(1)} km/h</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </Card>
-
-      {/* Activity Type Selector & Controls */}
-      <Card className="glass">
-        <CardContent className="p-4">
-          <AnimatePresence mode="wait">
-            {!isTracking ? (
-              <motion.div
-                key="selector"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                <div className="grid grid-cols-4 gap-2">
-                  {activityTypes.map(({ type, label, icon: Icon, color }) => (
-                    <motion.button
-                      key={type}
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => setSelectedType(type)}
-                      className={cn(
-                        "p-4 rounded-xl border transition-all text-center",
-                        selectedType === type
-                          ? "border-primary bg-primary/10"
-                          : "border-border/50 hover:border-border"
-                      )}
-                    >
-                      <Icon
-                        className="w-6 h-6 mx-auto mb-2"
-                        style={{ color: selectedType === type ? color : undefined }}
-                      />
-                      <span className="text-sm font-medium">{label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-
-                <Button
-                  onClick={handleStart}
-                  className="w-full h-14 text-lg gradient-primary text-primary-foreground shadow-glow"
-                >
-                  <Play className="w-6 h-6 mr-2" />
-                  Start {activityTypes.find((a) => a.type === selectedType)?.label}
-                </Button>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="tracking"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-4"
-              >
-                <div className="grid grid-cols-3 gap-4">
+        <TabsContent value="track" className="space-y-6 mt-4">
+          {/* Map */}
+          <Card className="glass overflow-hidden">
+            <div className="h-[250px] relative">
+              {mapUrl ? (
+                <iframe
+                  src={mapUrl}
+                  className="w-full h-full border-0"
+                  title="Activity Map"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center bg-secondary">
                   <div className="text-center">
-                    <p className="text-3xl font-bold font-mono">{formatDuration(elapsedTime)}</p>
-                    <p className="text-xs text-muted-foreground">Duration</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold font-mono">{distanceKm.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground">Kilometers</p>
-                  </div>
-                  <div className="text-center">
-                    <p className="text-3xl font-bold font-mono">{currentSpeed.toFixed(1)}</p>
-                    <p className="text-xs text-muted-foreground">km/h</p>
+                    <MapPin className="w-8 h-8 mx-auto text-muted-foreground mb-2 animate-pulse" />
+                    <p className="text-sm text-muted-foreground">Getting your location...</p>
                   </div>
                 </div>
+              )}
 
-                <Button
-                  onClick={handleStop}
-                  variant="destructive"
-                  className="w-full h-14 text-lg"
-                >
-                  <Square className="w-6 h-6 mr-2" />
-                  Stop Activity
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </CardContent>
-      </Card>
+              {/* Current position indicator */}
+              {currentPosition && isTracking && (
+                <div className="absolute bottom-4 right-4 glass-strong rounded-xl px-3 py-2 flex items-center gap-2">
+                  <Navigation className="w-4 h-4 text-primary animate-pulse" />
+                  <span className="text-xs font-medium">
+                    {currentPosition.lat.toFixed(4)}, {currentPosition.lng.toFixed(4)}
+                  </span>
+                </div>
+              )}
 
-      {/* Stats Summary */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="glass">
-          <CardContent className="p-4 text-center">
-            <Footprints className="w-5 h-5 mx-auto mb-1 text-primary" />
-            <p className="text-2xl font-bold">{totalSteps.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">Total Steps</p>
-          </CardContent>
-        </Card>
-        <Card className="glass">
-          <CardContent className="p-4 text-center">
-            <Route className="w-5 h-5 mx-auto mb-1 text-success" />
-            <p className="text-2xl font-bold">{totalDistance.toFixed(1)}</p>
-            <p className="text-xs text-muted-foreground">Total km</p>
-          </CardContent>
-        </Card>
-        <Card className="glass">
-          <CardContent className="p-4 text-center">
-            <Flame className="w-5 h-5 mx-auto mb-1 text-destructive" />
-            <p className="text-2xl font-bold">{totalCalories.toLocaleString()}</p>
-            <p className="text-xs text-muted-foreground">Calories</p>
-          </CardContent>
-        </Card>
-        <Card className="glass">
-          <CardContent className="p-4 text-center">
-            <Timer className="w-5 h-5 mx-auto mb-1 text-warning" />
-            <p className="text-2xl font-bold">{Math.floor(totalDuration)}</p>
-            <p className="text-xs text-muted-foreground">Minutes</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Activity History */}
-      <Card className="glass">
-        <CardHeader>
-          <CardTitle className="text-lg">Recent Activities</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {activities.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Route className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p>No activities yet. Start tracking to see your history!</p>
+              {/* Overlay stats while tracking */}
+              {isTracking && (
+                <div className="absolute top-4 left-4 right-4 flex gap-2 flex-wrap">
+                  <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
+                    <Timer className="w-4 h-4 text-primary" />
+                    <span className="font-mono font-bold">{formatDuration(elapsedTime)}</span>
+                  </div>
+                  <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
+                    <Route className="w-4 h-4 text-primary" />
+                    <span className="font-mono font-bold">{distanceKm.toFixed(2)} km</span>
+                  </div>
+                  <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-primary" />
+                    <span className="font-mono font-bold">{currentSpeed.toFixed(1)} km/h</span>
+                  </div>
+                </div>
+              )}
             </div>
-          ) : (
-            activities.slice(0, 5).map((activity) => {
-              const activityInfo = activityTypes.find((a) => a.type === activity.type);
-              const Icon = activityInfo?.icon || Footprints;
-              return (
-                <div
-                  key={activity.id}
-                  className="flex items-center gap-4 p-3 rounded-xl bg-secondary/30"
-                >
-                  <div
-                    className="w-10 h-10 rounded-xl flex items-center justify-center"
-                    style={{ backgroundColor: (activityInfo?.color || "#F59E0B") + "20" }}
+          </Card>
+
+          {/* Activity Type Selector & Controls */}
+          <Card className="glass">
+            <CardContent className="p-4">
+              <AnimatePresence mode="wait">
+                {!isTracking ? (
+                  <motion.div
+                    key="selector"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-4"
                   >
-                    <Icon className="w-5 h-5" style={{ color: activityInfo?.color }} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium capitalize">{activity.type}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(new Date(activity.date), { addSuffix: true })}
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold">{activity.distanceKm.toFixed(2)} km</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDuration(activity.durationMinutes)}
-                    </p>
+                    <div className="grid grid-cols-4 gap-2">
+                      {activityTypes.map(({ type, label, icon: Icon, color }) => (
+                        <motion.button
+                          key={type}
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => setSelectedType(type)}
+                          className={cn(
+                            "p-4 rounded-xl border transition-all text-center",
+                            selectedType === type
+                              ? "border-primary bg-primary/10"
+                              : "border-border/50 hover:border-border"
+                          )}
+                        >
+                          <Icon
+                            className="w-6 h-6 mx-auto mb-2"
+                            style={{ color: selectedType === type ? color : undefined }}
+                          />
+                          <span className="text-sm font-medium">{label}</span>
+                        </motion.button>
+                      ))}
+                    </div>
+
+                    <Button
+                      onClick={handleStart}
+                      className="w-full h-14 text-lg gradient-primary text-primary-foreground shadow-glow"
+                    >
+                      <Play className="w-6 h-6 mr-2" />
+                      Start {activityTypes.find((a) => a.type === selectedType)?.label}
+                    </Button>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="tracking"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="space-y-4"
+                  >
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="text-center">
+                        <p className="text-3xl font-bold font-mono">{formatDuration(elapsedTime)}</p>
+                        <p className="text-xs text-muted-foreground">Duration</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold font-mono">{distanceKm.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">Kilometers</p>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-3xl font-bold font-mono">{currentSpeed.toFixed(1)}</p>
+                        <p className="text-xs text-muted-foreground">km/h</p>
+                      </div>
+                    </div>
+
+                    <Button
+                      onClick={handleStop}
+                      variant="destructive"
+                      className="w-full h-14 text-lg"
+                    >
+                      <Square className="w-6 h-6 mr-2" />
+                      Stop Activity
+                    </Button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </CardContent>
+          </Card>
+
+          {/* Stats Summary */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Footprints className="w-5 h-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold">{totalSteps.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Steps</p>
+              </CardContent>
+            </Card>
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Route className="w-5 h-5 mx-auto mb-1 text-success" />
+                <p className="text-2xl font-bold">{totalDistance.toFixed(1)}</p>
+                <p className="text-xs text-muted-foreground">Total km</p>
+              </CardContent>
+            </Card>
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Flame className="w-5 h-5 mx-auto mb-1 text-destructive" />
+                <p className="text-2xl font-bold">{totalCalories.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Calories</p>
+              </CardContent>
+            </Card>
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Timer className="w-5 h-5 mx-auto mb-1 text-warning" />
+                <p className="text-2xl font-bold">{Math.floor(totalDuration)}</p>
+                <p className="text-xs text-muted-foreground">Minutes</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Activity History */}
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle className="text-lg">Recent Activities</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {activities.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Route className="w-10 h-10 mx-auto mb-2 opacity-50" />
+                  <p>No activities yet. Start tracking to see your history!</p>
+                </div>
+              ) : (
+                activities.slice(0, 5).map((activity) => {
+                  const activityInfo = activityTypes.find((a) => a.type === activity.type);
+                  const Icon = activityInfo?.icon || Footprints;
+                  return (
+                    <div
+                      key={activity.id}
+                      className="flex items-center gap-4 p-3 rounded-xl bg-secondary/30"
+                    >
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center"
+                        style={{ backgroundColor: (activityInfo?.color || "#F59E0B") + "20" }}
+                      >
+                        <Icon className="w-5 h-5" style={{ color: activityInfo?.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium capitalize">{activity.type}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDistanceToNow(new Date(activity.date), { addSuffix: true })}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{activity.distanceKm.toFixed(2)} km</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDuration(activity.durationMinutes)}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="navigate" className="space-y-6 mt-4">
+          {/* Map for Navigation */}
+          <Card className="glass overflow-hidden">
+            <div className="h-[250px] relative">
+              {mapUrl ? (
+                <iframe
+                  src={mapUrl}
+                  className="w-full h-full border-0"
+                  title="Navigation Map"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center bg-secondary">
+                  <div className="text-center">
+                    <MapPin className="w-8 h-8 mx-auto text-muted-foreground mb-2 animate-pulse" />
+                    <p className="text-sm text-muted-foreground">Getting your location...</p>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </CardContent>
-      </Card>
+              )}
+            </div>
+          </Card>
+
+          <NavigationCard currentPosition={currentPosition} />
+        </TabsContent>
+
+        <TabsContent value="stats" className="space-y-6 mt-4">
+          <ActivityCharts activities={activities} />
+
+          {/* Stats Summary */}
+          <div className="grid grid-cols-2 gap-3">
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Footprints className="w-5 h-5 mx-auto mb-1 text-primary" />
+                <p className="text-2xl font-bold">{totalSteps.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Total Steps</p>
+              </CardContent>
+            </Card>
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Route className="w-5 h-5 mx-auto mb-1 text-success" />
+                <p className="text-2xl font-bold">{totalDistance.toFixed(1)}</p>
+                <p className="text-xs text-muted-foreground">Total km</p>
+              </CardContent>
+            </Card>
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Flame className="w-5 h-5 mx-auto mb-1 text-destructive" />
+                <p className="text-2xl font-bold">{totalCalories.toLocaleString()}</p>
+                <p className="text-xs text-muted-foreground">Calories</p>
+              </CardContent>
+            </Card>
+            <Card className="glass">
+              <CardContent className="p-4 text-center">
+                <Timer className="w-5 h-5 mx-auto mb-1 text-warning" />
+                <p className="text-2xl font-bold">{Math.floor(totalDuration)}</p>
+                <p className="text-xs text-muted-foreground">Minutes</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="achievements" className="space-y-6 mt-4">
+          <AchievementsBadges activities={activities} />
+
+          {/* All-time Stats */}
+          <Card className="glass">
+            <CardHeader>
+              <CardTitle className="text-lg">All-Time Stats</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
+                <span className="text-muted-foreground">Total Activities</span>
+                <span className="font-bold">{activities.length}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
+                <span className="text-muted-foreground">Total Distance</span>
+                <span className="font-bold">{totalDistance.toFixed(2)} km</span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
+                <span className="text-muted-foreground">Total Calories</span>
+                <span className="font-bold">{totalCalories.toLocaleString()} cal</span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
+                <span className="text-muted-foreground">Total Time</span>
+                <span className="font-bold">{formatDuration(totalDuration)}</span>
+              </div>
+              <div className="flex justify-between items-center p-3 rounded-xl bg-secondary/30">
+                <span className="text-muted-foreground">Total Steps</span>
+                <span className="font-bold">{totalSteps.toLocaleString()}</span>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
