@@ -6,7 +6,7 @@ export interface Activity {
   id: string;
   type: "run" | "walk" | "cycle" | "drive";
   date: string;
-  startTime: number;
+  startTime?: number;
   endTime?: number;
   durationMinutes: number;
   distanceKm: number;
@@ -25,14 +25,16 @@ interface ActivityState {
   routePoints: { lat: number; lng: number }[];
   distanceKm: number;
   startTime: number | null;
+  isLoading: boolean;
 
   // Actions
   startTracking: (type: Activity["type"]) => void;
-  stopTracking: () => void;
+  stopTracking: () => Promise<void>;
   updatePosition: (lat: number, lng: number) => void;
   addActivity: (activity: Omit<Activity, "id">) => void;
-  deleteActivity: (id: string) => void;
-  syncWithSupabase: (userId: string) => Promise<void>;
+  deleteActivity: (id: string) => Promise<void>;
+  fetchActivities: () => Promise<void>;
+  saveActivity: (activity: Activity) => Promise<void>;
 }
 
 const calculateDistance = (
@@ -55,8 +57,7 @@ const calculateDistance = (
 };
 
 const estimateSteps = (distanceKm: number, type: Activity["type"]): number => {
-  // Average stride length varies by activity
-  const strideLength = type === "run" ? 1.2 : 0.75; // meters
+  const strideLength = type === "run" ? 1.2 : 0.75;
   return Math.round((distanceKm * 1000) / strideLength);
 };
 
@@ -65,10 +66,8 @@ const estimateCalories = (
   durationMinutes: number,
   type: Activity["type"]
 ): number => {
-  // MET values for different activities
   const metValues = { run: 9.8, walk: 3.8, cycle: 7.5, drive: 1.5 };
   const met = metValues[type];
-  // Assuming 70kg average weight
   return Math.round((met * 70 * durationMinutes) / 60);
 };
 
@@ -83,6 +82,72 @@ export const useActivityStore = create<ActivityState>()(
       routePoints: [],
       distanceKm: 0,
       startTime: null,
+      isLoading: false,
+
+      fetchActivities: async () => {
+        set({ isLoading: true });
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            set({ isLoading: false });
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from("activities")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (error) {
+            console.error("Error fetching activities:", error);
+            set({ isLoading: false });
+            return;
+          }
+
+          const activities: Activity[] = (data || []).map((row) => ({
+            id: row.id,
+            type: row.type as Activity["type"],
+            date: row.date,
+            durationMinutes: Number(row.duration_minutes),
+            distanceKm: Number(row.distance_km),
+            avgSpeedKmh: Number(row.avg_speed_kmh || 0),
+            route: (row.route_points as { lat: number; lng: number }[]) || [],
+            steps: row.steps || 0,
+            caloriesBurned: row.calories_burned || 0,
+          }));
+
+          set({ activities, isLoading: false });
+        } catch (error) {
+          console.error("Error fetching activities:", error);
+          set({ isLoading: false });
+        }
+      },
+
+      saveActivity: async (activity: Activity) => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { error } = await supabase.from("activities").insert({
+            id: activity.id,
+            user_id: user.id,
+            type: activity.type,
+            date: activity.date,
+            duration_minutes: activity.durationMinutes,
+            distance_km: activity.distanceKm,
+            avg_speed_kmh: activity.avgSpeedKmh,
+            route_points: activity.route,
+            steps: activity.steps || 0,
+            calories_burned: activity.caloriesBurned || 0,
+          });
+
+          if (error) {
+            console.error("Error saving activity:", error);
+          }
+        } catch (error) {
+          console.error("Error saving activity:", error);
+        }
+      },
 
       startTracking: (type) => {
         set({
@@ -103,7 +168,7 @@ export const useActivityStore = create<ActivityState>()(
         });
       },
 
-      stopTracking: () => {
+      stopTracking: async () => {
         const state = get();
         if (state.currentActivity && state.startTime) {
           const endTime = Date.now();
@@ -125,6 +190,9 @@ export const useActivityStore = create<ActivityState>()(
               state.currentActivity.type
             ),
           };
+
+          // Save to database
+          await get().saveActivity(completedActivity);
 
           set((s) => ({
             activities: [completedActivity, ...s.activities],
@@ -171,16 +239,23 @@ export const useActivityStore = create<ActivityState>()(
         set((s) => ({ activities: [newActivity, ...s.activities] }));
       },
 
-      deleteActivity: (id) => {
-        set((s) => ({
-          activities: s.activities.filter((a) => a.id !== id),
-        }));
-      },
+      deleteActivity: async (id) => {
+        try {
+          const { error } = await supabase
+            .from("activities")
+            .delete()
+            .eq("id", id);
 
-      syncWithSupabase: async (userId) => {
-        // For now, activities are stored locally
-        // This could be extended to sync with Supabase
-        console.log("Activity sync for user:", userId);
+          if (error) {
+            console.error("Error deleting activity:", error);
+          }
+
+          set((s) => ({
+            activities: s.activities.filter((a) => a.id !== id),
+          }));
+        } catch (error) {
+          console.error("Error deleting activity:", error);
+        }
       },
     }),
     {
