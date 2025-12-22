@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, X, Send, Loader2, Sparkles, CalendarPlus, Target, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
+import { Bot, X, Send, Loader2, Sparkles, CalendarPlus, Target, Mic, MicOff, Volume2, VolumeX, Play, BookOpen, Timer, MapPin } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -8,11 +8,13 @@ import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
 import { useCalendarStore, EVENT_COLORS } from "@/store/calendarStore";
 import { useJournalStore } from "@/store/journalStore";
+import { useActivityStore } from "@/store/activityStore";
 import { format, subDays, addDays } from "date-fns";
 import { calculateStreak, calculateCompletionRate } from "@/lib/utils";
 import { toast } from "sonner";
 import { HABIT_COLORS } from "@/types";
 import { useSpeech } from "@/hooks/useSpeech";
+import { useNavigate } from "react-router-dom";
 
 interface Message {
   role: "user" | "assistant";
@@ -37,6 +39,23 @@ interface ParsedHabit {
   goalTarget?: number;
 }
 
+interface ParsedFocus {
+  duration: number;
+  task?: string;
+  mode?: "pomodoro" | "timer" | "stopwatch";
+}
+
+interface ParsedActivity {
+  type: "run" | "walk" | "cycle" | "drive";
+}
+
+interface ParsedJournal {
+  title: string;
+  content: string;
+  mood?: string;
+  tags?: string[];
+}
+
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -44,11 +63,13 @@ export function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   
   const { habits, logs, addHabit } = useHabitStore();
-  const { sessions } = useFocusStore();
+  const { sessions, timer, startTimer } = useFocusStore();
   const { events, addEvent } = useCalendarStore();
-  const { entries: journalEntries } = useJournalStore();
+  const { entries: journalEntries, addEntry } = useJournalStore();
+  const { activities, isTracking, startTracking, stopTracking, distanceKm } = useActivityStore();
 
   // Speech hook for voice input/output
   const { 
@@ -118,8 +139,8 @@ export function AIAssistant() {
     return format(today, "yyyy-MM-dd");
   };
 
-  // Extract and create event or habit from AI response
-  const tryExtractAndCreateFromAI = useCallback((content: string) => {
+  // Extract and execute actions from AI response
+  const tryExtractAndExecuteActions = useCallback((content: string) => {
     // Look for JSON blocks in the response
     const jsonMatches = content.matchAll(/```json\s*([\s\S]*?)\s*```/g);
     
@@ -131,16 +152,12 @@ export function AIAssistant() {
         if (parsed.action === "create_event" && parsed.event) {
           const eventData = parsed.event as ParsedEvent;
           
-          // Validate required fields
           if (!eventData.title || !eventData.date || !eventData.startTime || !eventData.endTime) {
-            console.log("Missing required event fields");
             continue;
           }
 
-          // Parse the date (handle natural language)
           const parsedDate = parseNaturalDate(eventData.date);
           
-          // Create the event
           addEvent({
             title: eventData.title,
             date: parsedDate,
@@ -160,20 +177,16 @@ export function AIAssistant() {
         if (parsed.action === "create_habit" && parsed.habit) {
           const habitData = parsed.habit as ParsedHabit;
           
-          // Validate required fields
           if (!habitData.name) {
-            console.log("Missing required habit name");
             continue;
           }
 
-          // Build schedule object
           const schedule = {
             type: habitData.scheduleType || "daily",
             daysOfWeek: habitData.daysOfWeek,
             timesPerWeek: habitData.timesPerWeek,
           };
           
-          // Create the habit
           addHabit({
             name: habitData.name,
             description: habitData.description || "",
@@ -188,11 +201,89 @@ export function AIAssistant() {
             icon: <Target className="w-4 h-4" />,
           });
         }
+
+        // Handle focus session start
+        if (parsed.action === "start_focus" && parsed.focus) {
+          const focusData = parsed.focus as ParsedFocus;
+          
+          const duration = focusData.duration ? focusData.duration * 60 : undefined;
+          const mode = focusData.mode === "stopwatch" ? "deepFocus" : "pomodoro";
+          
+          startTimer(mode, focusData.task, duration);
+          navigate("/focus");
+
+          toast.success("Focus session started!", {
+            description: `${focusData.duration || 25} minute session`,
+            icon: <Timer className="w-4 h-4" />,
+          });
+        }
+
+        // Handle activity tracking
+        if (parsed.action === "start_activity" && parsed.activity) {
+          const activityData = parsed.activity as ParsedActivity;
+          
+          if (!isTracking) {
+            startTracking(activityData.type);
+            navigate("/activity");
+            
+            toast.success(`Started ${activityData.type}ing!`, {
+              description: "GPS tracking is now active",
+              icon: <MapPin className="w-4 h-4" />,
+            });
+          }
+        }
+
+        if (parsed.action === "stop_activity") {
+          if (isTracking) {
+            stopTracking();
+            
+            toast.success("Activity stopped!", {
+              description: `Tracked ${distanceKm.toFixed(2)} km`,
+              icon: <MapPin className="w-4 h-4" />,
+            });
+          }
+        }
+
+        // Handle journal creation
+        if (parsed.action === "create_journal" && parsed.journal) {
+          const journalData = parsed.journal as ParsedJournal;
+          
+          addEntry({
+            title: journalData.title,
+            content: journalData.content,
+            mood: journalData.mood as any,
+            tags: journalData.tags || [],
+            date: format(new Date(), "yyyy-MM-dd"),
+          });
+
+          toast.success("Journal entry created!", {
+            description: journalData.title,
+            icon: <BookOpen className="w-4 h-4" />,
+          });
+        }
+
+        // Handle navigation
+        if (parsed.action === "navigate" && parsed.page) {
+          navigate(parsed.page);
+          toast.success("Navigating...", {
+            description: `Going to ${parsed.page.replace("/", "").replace("-", " ") || "home"}`,
+          });
+        }
+
+        // Handle workout start
+        if (parsed.action === "start_workout" && parsed.workout) {
+          navigate("/activity");
+          // The workout tab will be activated
+          toast.success("Opening workouts!", {
+            icon: <Play className="w-4 h-4" />,
+          });
+        }
+
       } catch (e) {
         console.log("Failed to parse AI action JSON:", e);
       }
     }
-  }, [addEvent, addHabit, parseNaturalDate]);
+  }, [addEvent, addHabit, parseNaturalDate, startTimer, startTracking, stopTracking, isTracking, distanceKm, addEntry, navigate]);
   
 
   const buildContext = useCallback(() => {
@@ -216,9 +307,17 @@ export function AIAssistant() {
     
     // Recent journal entries
     const recentJournal = journalEntries.slice(0, 3);
+
+    // Activity stats
+    const totalDistance = activities.reduce((sum, a) => sum + a.distanceKm, 0);
+    const totalSteps = activities.reduce((sum, a) => sum + (a.steps || 0), 0);
+    const totalCalories = activities.reduce((sum, a) => sum + (a.caloriesBurned || 0), 0);
     
     return {
       today,
+      currentlyTracking: isTracking,
+      currentTrackingDistance: distanceKm,
+      focusTimerRunning: timer.isRunning,
       habits: {
         total: activeHabits.length,
         stats: habitStats,
@@ -231,9 +330,20 @@ export function AIAssistant() {
         totalMinutesLast7Days: totalFocusMinutes,
         sessionsCount: recentFocus.length,
       },
+      activity: {
+        totalActivities: activities.length,
+        totalDistanceKm: totalDistance,
+        totalSteps,
+        totalCalories,
+        recentActivities: activities.slice(0, 3).map(a => ({
+          type: a.type,
+          date: a.date,
+          distanceKm: a.distanceKm,
+        })),
+      },
       recentJournalMoods: recentJournal.map(j => j.mood).filter(Boolean),
     };
-  }, [habits, logs, events, sessions, journalEntries]);
+  }, [habits, logs, events, sessions, journalEntries, activities, isTracking, distanceKm, timer.isRunning]);
   
   const sendMessage = async () => {
     if (!input.trim() || isLoading) return;
@@ -317,9 +427,9 @@ export function AIAssistant() {
         }
       }
 
-      // After streaming is complete, try to extract and create event/habit
+      // After streaming is complete, try to extract and execute actions
       if (assistantContent) {
-        tryExtractAndCreateFromAI(assistantContent);
+        tryExtractAndExecuteActions(assistantContent);
         
         // Speak the response if voice is enabled
         if (voiceEnabled) {
@@ -393,7 +503,7 @@ export function AIAssistant() {
                   </div>
                   <div>
                     <h3 className="font-semibold">AI Assistant</h3>
-                    <p className="text-xs text-muted-foreground">Ask me anything</p>
+                    <p className="text-xs text-muted-foreground">I can control the entire app</p>
                   </div>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)}>
@@ -407,13 +517,16 @@ export function AIAssistant() {
                   <div className="text-center py-8">
                     <Sparkles className="w-8 h-8 text-primary mx-auto mb-3" />
                     <p className="text-muted-foreground text-sm">
-                      Hi! I'm your productivity assistant. Ask me:
+                      I can do anything in the app! Try:
                     </p>
                     <ul className="text-xs text-muted-foreground mt-2 space-y-1">
-                      <li>• "What time is it?"</li>
-                      <li>• "Schedule a meeting tomorrow at 3pm"</li>
+                      <li>• "Start a 25 min focus session"</li>
+                      <li>• "Create a habit to drink water"</li>
+                      <li>• "Start tracking my run"</li>
+                      <li>• "Schedule lunch tomorrow at noon"</li>
+                      <li>• "Write a journal entry about today"</li>
                       <li>• "How are my habits going?"</li>
-                      <li>• "What's on my calendar today?"</li>
+                      <li>• "Take me to the calendar"</li>
                     </ul>
                   </div>
                 ) : (
@@ -489,18 +602,24 @@ export function AIAssistant() {
                     </div>
                     <Button
                       type="button"
-                      size="icon"
+                      size="sm"
                       variant="ghost"
                       onClick={() => {
-                        if (isSpeaking) stopSpeaking();
+                        if (isSpeaking) {
+                          stopSpeaking();
+                        }
                         setVoiceEnabled(!voiceEnabled);
                       }}
-                      title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+                      className="gap-2"
                     >
                       {voiceEnabled ? (
-                        <Volume2 className="w-4 h-4 text-primary" />
+                        <>
+                          <Volume2 className="w-4 h-4" />
+                        </>
                       ) : (
-                        <VolumeX className="w-4 h-4 text-muted-foreground" />
+                        <>
+                          <VolumeX className="w-4 h-4" />
+                        </>
                       )}
                     </Button>
                   </div>
@@ -509,7 +628,6 @@ export function AIAssistant() {
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
-                    if (isListening) stopListening();
                     sendMessage();
                   }}
                   className="flex gap-2"
@@ -517,9 +635,9 @@ export function AIAssistant() {
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder={isListening ? "Listening..." : "Ask me anything..."}
+                    placeholder="Ask me to do anything..."
                     className="flex-1"
-                    disabled={isLoading}
+                    disabled={isLoading || isListening}
                   />
                   <Button type="submit" size="icon" disabled={isLoading || !input.trim()}>
                     {isLoading ? (
