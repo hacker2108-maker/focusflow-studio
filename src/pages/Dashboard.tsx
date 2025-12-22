@@ -8,6 +8,8 @@ import { isHabitDueToday, getToday, calculateStreak, formatMinutes, formatDate }
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { WeatherWidget } from "@/components/WeatherWidget";
+import { TimeWidget } from "@/components/TimeWidget";
+
 
 export default function Dashboard() {
   const { habits, logs, logHabit } = useHabitStore();
@@ -43,7 +45,11 @@ export default function Dashboard() {
         </div>
       </header>
 
-      {/* Weather Widget */}
+      {/* Time and Weather Widgets */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <TimeWidget />
+        <WeatherWidget compact />
+      </div>
       <WeatherWidget />
 
       {/* Stats Grid */}
