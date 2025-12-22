@@ -114,7 +114,18 @@ export function SwipeableNavigation({ children }: SwipeableNavigationProps) {
   };
 
   return (
-    <div className="relative min-h-screen overflow-x-hidden">
+    <div
+      className="relative min-h-screen"
+      onPointerDown={(e) => {
+        startXRef.current = e.clientX;
+        const isEdge =
+          e.clientX <= SWIPE_EDGE_PX ||
+          e.clientX >= window.innerWidth - SWIPE_EDGE_PX;
+        setDragEnabled(isEdge && !shouldBlockPageSwipe(e.target));
+      }}
+      onPointerUp={onPointerUp}
+      onPointerCancel={onPointerUp}
+    >
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
         <motion.div
           key={location.pathname}
@@ -127,16 +138,17 @@ export function SwipeableNavigation({ children }: SwipeableNavigationProps) {
             x: { type: "spring", stiffness: 300, damping: 30 },
             opacity: { duration: 0.2 },
           }}
-          drag={dragEnabled ? "x" : false}
-          dragDirectionLock
-          dragConstraints={{ left: 0, right: 0 }}
-          dragElastic={0.2}
-          dragMomentum={false}
-          onDragEnd={handleDragEnd}
-          onPointerDownCapture={onPointerDownCapture}
-          onPointerUp={onPointerUp}
-          onPointerCancel={onPointerUp}
-          className="touch-pan-y"
+          {...(dragEnabled
+            ? {
+                drag: "x" as const,
+                dragDirectionLock: true,
+                dragConstraints: { left: 0, right: 0 },
+                dragElastic: 0.2,
+                dragMomentum: false,
+                onDragEnd: handleDragEnd,
+              }
+            : {})}
+          className="min-h-screen"
         >
           {children}
         </motion.div>
