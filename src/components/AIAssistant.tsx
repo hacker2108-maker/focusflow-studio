@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, X, Send, Loader2, Sparkles, CalendarPlus } from "lucide-react";
+import { Bot, X, Send, Loader2, Sparkles, CalendarPlus, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -8,9 +8,10 @@ import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
 import { useCalendarStore, EVENT_COLORS } from "@/store/calendarStore";
 import { useJournalStore } from "@/store/journalStore";
-import { format, subDays, addDays, parse } from "date-fns";
+import { format, subDays, addDays } from "date-fns";
 import { calculateStreak, calculateCompletionRate } from "@/lib/utils";
 import { toast } from "sonner";
+import { HABIT_COLORS } from "@/types";
 
 interface Message {
   role: "user" | "assistant";
@@ -25,6 +26,16 @@ interface ParsedEvent {
   description?: string;
 }
 
+interface ParsedHabit {
+  name: string;
+  description?: string;
+  scheduleType?: "daily" | "weekdays" | "customDays" | "timesPerWeek";
+  daysOfWeek?: number[];
+  timesPerWeek?: number;
+  goalType?: "check" | "count";
+  goalTarget?: number;
+}
+
 export function AIAssistant() {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,7 +43,7 @@ export function AIAssistant() {
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
-  const { habits, logs } = useHabitStore();
+  const { habits, logs, addHabit } = useHabitStore();
   const { sessions } = useFocusStore();
   const { events, addEvent } = useCalendarStore();
   const { entries: journalEntries } = useJournalStore();
@@ -75,50 +86,83 @@ export function AIAssistant() {
     return format(today, "yyyy-MM-dd");
   };
 
-  // Extract and create event from AI response
-  const tryExtractAndCreateEvent = useCallback((content: string) => {
-    // Look for JSON block in the response
-    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
-    if (!jsonMatch) return null;
-
-    try {
-      const parsed = JSON.parse(jsonMatch[1]);
-      
-      if (parsed.action === "create_event" && parsed.event) {
-        const eventData = parsed.event as ParsedEvent;
+  // Extract and create event or habit from AI response
+  const tryExtractAndCreateFromAI = useCallback((content: string) => {
+    // Look for JSON blocks in the response
+    const jsonMatches = content.matchAll(/```json\s*([\s\S]*?)\s*```/g);
+    
+    for (const jsonMatch of jsonMatches) {
+      try {
+        const parsed = JSON.parse(jsonMatch[1]);
         
-        // Validate required fields
-        if (!eventData.title || !eventData.date || !eventData.startTime || !eventData.endTime) {
-          console.log("Missing required event fields");
-          return null;
+        // Handle event creation
+        if (parsed.action === "create_event" && parsed.event) {
+          const eventData = parsed.event as ParsedEvent;
+          
+          // Validate required fields
+          if (!eventData.title || !eventData.date || !eventData.startTime || !eventData.endTime) {
+            console.log("Missing required event fields");
+            continue;
+          }
+
+          // Parse the date (handle natural language)
+          const parsedDate = parseNaturalDate(eventData.date);
+          
+          // Create the event
+          addEvent({
+            title: eventData.title,
+            date: parsedDate,
+            startTime: eventData.startTime,
+            endTime: eventData.endTime,
+            description: eventData.description || "",
+            color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
+          });
+
+          toast.success(`Event "${eventData.title}" created!`, {
+            description: `Scheduled for ${format(new Date(parsedDate), "EEEE, MMMM d")} at ${eventData.startTime}`,
+            icon: <CalendarPlus className="w-4 h-4" />,
+          });
         }
-
-        // Parse the date (handle natural language)
-        const parsedDate = parseNaturalDate(eventData.date);
         
-        // Create the event
-        const newEvent = addEvent({
-          title: eventData.title,
-          date: parsedDate,
-          startTime: eventData.startTime,
-          endTime: eventData.endTime,
-          description: eventData.description || "",
-          color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
-        });
+        // Handle habit creation
+        if (parsed.action === "create_habit" && parsed.habit) {
+          const habitData = parsed.habit as ParsedHabit;
+          
+          // Validate required fields
+          if (!habitData.name) {
+            console.log("Missing required habit name");
+            continue;
+          }
 
-        toast.success(`Event "${eventData.title}" created!`, {
-          description: `Scheduled for ${format(new Date(parsedDate), "EEEE, MMMM d")} at ${eventData.startTime}`,
-          icon: <CalendarPlus className="w-4 h-4" />,
-        });
+          // Build schedule object
+          const schedule = {
+            type: habitData.scheduleType || "daily",
+            daysOfWeek: habitData.daysOfWeek,
+            timesPerWeek: habitData.timesPerWeek,
+          };
+          
+          // Create the habit
+          addHabit({
+            name: habitData.name,
+            description: habitData.description || "",
+            color: HABIT_COLORS[Math.floor(Math.random() * HABIT_COLORS.length)],
+            schedule: schedule as any,
+            goalType: habitData.goalType || "check",
+            goalTarget: habitData.goalTarget,
+          });
 
-        return newEvent;
+          toast.success(`Habit "${habitData.name}" created!`, {
+            description: `Schedule: ${habitData.scheduleType || "daily"}`,
+            icon: <Target className="w-4 h-4" />,
+          });
+        }
+      } catch (e) {
+        console.log("Failed to parse AI action JSON:", e);
       }
-    } catch (e) {
-      console.log("Failed to parse event JSON:", e);
     }
-    return null;
-  }, [addEvent]);
+  }, [addEvent, addHabit, parseNaturalDate]);
   
+
   const buildContext = useCallback(() => {
     const today = format(new Date(), "yyyy-MM-dd");
     const last7Days = Array.from({ length: 7 }, (_, i) => format(subDays(new Date(), i), "yyyy-MM-dd"));
@@ -241,9 +285,9 @@ export function AIAssistant() {
         }
       }
 
-      // After streaming is complete, try to extract and create event
+      // After streaming is complete, try to extract and create event/habit
       if (assistantContent) {
-        tryExtractAndCreateEvent(assistantContent);
+        tryExtractAndCreateFromAI(assistantContent);
       }
     } catch (error) {
       console.error("AI error:", error);
