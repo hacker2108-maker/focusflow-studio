@@ -175,16 +175,16 @@ export default function Activity() {
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
               <MapUpdater center={mapCenter} />
-              {currentPosition && (
+              {currentPosition ? (
                 <Marker position={[currentPosition.lat, currentPosition.lng]} />
-              )}
-              {routePoints.length > 1 && (
+              ) : null}
+              {routePoints.length > 1 ? (
                 <Polyline
                   positions={routePoints.map((p) => [p.lat, p.lng] as [number, number])}
                   color={activityColor}
                   weight={4}
                 />
-              )}
+              ) : null}
             </MapContainer>
           ) : (
             <div className="h-full flex items-center justify-center bg-secondary">
