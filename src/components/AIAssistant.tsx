@@ -1,19 +1,28 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, X, Send, Loader2, Sparkles } from "lucide-react";
+import { Bot, X, Send, Loader2, Sparkles, CalendarPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
-import { useCalendarStore } from "@/store/calendarStore";
+import { useCalendarStore, EVENT_COLORS } from "@/store/calendarStore";
 import { useJournalStore } from "@/store/journalStore";
-import { format, subDays } from "date-fns";
+import { format, subDays, addDays, parse } from "date-fns";
 import { calculateStreak, calculateCompletionRate } from "@/lib/utils";
+import { toast } from "sonner";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+}
+
+interface ParsedEvent {
+  title: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  description?: string;
 }
 
 export function AIAssistant() {
@@ -25,7 +34,7 @@ export function AIAssistant() {
   
   const { habits, logs } = useHabitStore();
   const { sessions } = useFocusStore();
-  const { events } = useCalendarStore();
+  const { events, addEvent } = useCalendarStore();
   const { entries: journalEntries } = useJournalStore();
   
   const scrollToBottom = () => {
@@ -35,6 +44,80 @@ export function AIAssistant() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  // Parse natural language dates like "tomorrow", "next monday", etc.
+  const parseNaturalDate = (dateStr: string): string => {
+    const today = new Date();
+    const lowerDate = dateStr.toLowerCase().trim();
+    
+    if (lowerDate === "today") {
+      return format(today, "yyyy-MM-dd");
+    }
+    if (lowerDate === "tomorrow") {
+      return format(addDays(today, 1), "yyyy-MM-dd");
+    }
+    if (lowerDate.includes("next")) {
+      const days = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+      for (let i = 0; i < days.length; i++) {
+        if (lowerDate.includes(days[i])) {
+          const currentDay = today.getDay();
+          let daysToAdd = (i - currentDay + 7) % 7;
+          if (daysToAdd === 0) daysToAdd = 7; // next week if same day
+          return format(addDays(today, daysToAdd), "yyyy-MM-dd");
+        }
+      }
+    }
+    // Try to parse as YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+      return dateStr;
+    }
+    // Default to today if unparseable
+    return format(today, "yyyy-MM-dd");
+  };
+
+  // Extract and create event from AI response
+  const tryExtractAndCreateEvent = useCallback((content: string) => {
+    // Look for JSON block in the response
+    const jsonMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+    if (!jsonMatch) return null;
+
+    try {
+      const parsed = JSON.parse(jsonMatch[1]);
+      
+      if (parsed.action === "create_event" && parsed.event) {
+        const eventData = parsed.event as ParsedEvent;
+        
+        // Validate required fields
+        if (!eventData.title || !eventData.date || !eventData.startTime || !eventData.endTime) {
+          console.log("Missing required event fields");
+          return null;
+        }
+
+        // Parse the date (handle natural language)
+        const parsedDate = parseNaturalDate(eventData.date);
+        
+        // Create the event
+        const newEvent = addEvent({
+          title: eventData.title,
+          date: parsedDate,
+          startTime: eventData.startTime,
+          endTime: eventData.endTime,
+          description: eventData.description || "",
+          color: EVENT_COLORS[Math.floor(Math.random() * EVENT_COLORS.length)],
+        });
+
+        toast.success(`Event "${eventData.title}" created!`, {
+          description: `Scheduled for ${format(new Date(parsedDate), "EEEE, MMMM d")} at ${eventData.startTime}`,
+          icon: <CalendarPlus className="w-4 h-4" />,
+        });
+
+        return newEvent;
+      }
+    } catch (e) {
+      console.log("Failed to parse event JSON:", e);
+    }
+    return null;
+  }, [addEvent]);
   
   const buildContext = useCallback(() => {
     const today = format(new Date(), "yyyy-MM-dd");
@@ -157,6 +240,11 @@ export function AIAssistant() {
           }
         }
       }
+
+      // After streaming is complete, try to extract and create event
+      if (assistantContent) {
+        tryExtractAndCreateEvent(assistantContent);
+      }
     } catch (error) {
       console.error("AI error:", error);
       setMessages(prev => [
@@ -166,6 +254,11 @@ export function AIAssistant() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Clean display content (remove JSON blocks for cleaner display)
+  const cleanDisplayContent = (content: string): string => {
+    return content.replace(/```json\s*[\s\S]*?\s*```/g, "").trim();
   };
   
   return (
@@ -230,13 +323,13 @@ export function AIAssistant() {
                   <div className="text-center py-8">
                     <Sparkles className="w-8 h-8 text-primary mx-auto mb-3" />
                     <p className="text-muted-foreground text-sm">
-                      Hi! I'm your productivity assistant. Ask me about:
+                      Hi! I'm your productivity assistant. Ask me:
                     </p>
                     <ul className="text-xs text-muted-foreground mt-2 space-y-1">
-                      <li>• "What's on my calendar today?"</li>
+                      <li>• "What time is it?"</li>
+                      <li>• "Schedule a meeting tomorrow at 3pm"</li>
                       <li>• "How are my habits going?"</li>
-                      <li>• "What's the weather like?"</li>
-                      <li>• "Give me productivity tips"</li>
+                      <li>• "What's on my calendar today?"</li>
                     </ul>
                   </div>
                 ) : (
@@ -256,7 +349,9 @@ export function AIAssistant() {
                             : "bg-secondary rounded-bl-md"
                         )}
                       >
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                        <p className="text-sm whitespace-pre-wrap">
+                          {msg.role === "assistant" ? cleanDisplayContent(msg.content) : msg.content}
+                        </p>
                       </div>
                     </div>
                   ))
