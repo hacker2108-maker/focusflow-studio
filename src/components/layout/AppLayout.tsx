@@ -1,5 +1,6 @@
 import { ReactNode, useEffect } from "react";
-import { BottomNav, Sidebar } from "./Navigation";
+import { Sidebar } from "./Navigation";
+import { SwipeableBottomNav } from "./SwipeableNavigation";
 import { FocusMiniBanner } from "@/components/FocusMiniBanner";
 import { AIAssistant } from "@/components/AIAssistant";
 import { useFocusStore } from "@/store/focusStore";
@@ -32,12 +33,12 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="min-h-screen bg-background">
       <Sidebar />
       {timer.isRunning && <FocusMiniBanner />}
-      <main className={`md:ml-64 pb-20 md:pb-6 ${timer.isRunning ? "pt-14" : ""}`}>
-        <div className="max-w-4xl mx-auto px-4 py-6">
+      <main className={`md:ml-64 pb-24 md:pb-6 ${timer.isRunning ? "pt-14 md:pt-0" : "pt-0"}`}>
+        <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
           {children}
         </div>
       </main>
-      <BottomNav />
+      <SwipeableBottomNav />
       <AIAssistant />
     </div>
   );

@@ -301,8 +301,8 @@ export default function Calendar() {
   );
   
   const renderWeekView = () => (
-    <div className="space-y-2">
-      <div className="grid grid-cols-7 gap-1">
+    <div className="space-y-2 overflow-x-auto scrollbar-hide -mx-2 px-2">
+      <div className="grid grid-cols-7 gap-0.5 min-w-[320px]">
         {weekDays.map((day) => {
           const isSelected = format(day, "yyyy-MM-dd") === selectedDate;
           const isToday = isSameDay(day, new Date());
@@ -313,30 +313,35 @@ export default function Calendar() {
               key={day.toISOString()}
               onClick={() => handleDayClick(day)}
               className={cn(
-                "p-2 rounded-lg flex flex-col items-center transition-all min-h-[120px]",
+                "p-1 sm:p-2 rounded-lg flex flex-col items-center transition-all min-h-[100px] sm:min-h-[120px]",
                 isSelected && "bg-primary/10 ring-2 ring-primary",
                 !isSelected && isToday && "bg-primary/5",
                 !isSelected && !isToday && "hover:bg-secondary"
               )}
             >
-              <span className="text-xs text-muted-foreground">{format(day, "EEE")}</span>
+              <span className="text-[10px] sm:text-xs text-muted-foreground">{format(day, "EEE")}</span>
               <span className={cn(
-                "text-lg font-semibold w-8 h-8 flex items-center justify-center rounded-full mt-1",
+                "text-sm sm:text-lg font-semibold w-6 h-6 sm:w-8 sm:h-8 flex items-center justify-center rounded-full mt-0.5 sm:mt-1",
                 isToday && "bg-primary text-primary-foreground"
               )}>
                 {format(day, "d")}
               </span>
-              <div className="flex-1 w-full mt-2 space-y-1 overflow-hidden">
-                {dayEvents.slice(0, 3).map((event) => (
+              <div className="flex-1 w-full mt-1 sm:mt-2 space-y-0.5 sm:space-y-1 overflow-hidden">
+                {dayEvents.slice(0, 2).map((event) => (
                   <div
                     key={event.id}
-                    className="text-[10px] truncate px-1.5 py-0.5 rounded flex items-center gap-1"
+                    className="text-[8px] sm:text-[10px] truncate px-0.5 sm:px-1.5 py-0.5 rounded flex items-center gap-0.5"
                     style={{ backgroundColor: event.color + "30", color: event.color }}
                   >
-                    {event.isRecurring && <Repeat className="w-2 h-2 flex-shrink-0" />}
-                    {event.startTime} {event.title}
+                    {event.isRecurring && <Repeat className="w-2 h-2 flex-shrink-0 hidden sm:block" />}
+                    <span className="truncate">{event.title}</span>
                   </div>
                 ))}
+                {dayEvents.length > 2 && (
+                  <div className="text-[8px] text-muted-foreground text-center">
+                    +{dayEvents.length - 2}
+                  </div>
+                )}
               </div>
             </button>
           );
@@ -368,23 +373,24 @@ export default function Calendar() {
       </div>
       
       {/* Calendar Navigation */}
-      <Card className="p-4 glass">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" onClick={view === "month" ? handlePrevMonth : handlePrevWeek}>
+      <Card className="p-3 sm:p-4 glass">
+        <div className="flex items-center justify-between mb-3 sm:mb-4 gap-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-1 min-w-0">
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={view === "month" ? handlePrevMonth : handlePrevWeek}>
               <ChevronLeft className="w-4 h-4" />
             </Button>
-            <h2 className="font-semibold text-lg min-w-[180px] text-center">
+            <h2 className="font-semibold text-sm sm:text-lg text-center truncate flex-1">
               {format(currentDate, view === "month" ? "MMMM yyyy" : "'Week of' MMM d")}
             </h2>
-            <Button variant="ghost" size="icon" onClick={view === "month" ? handleNextMonth : handleNextWeek}>
+            <Button variant="ghost" size="icon" className="h-8 w-8 shrink-0" onClick={view === "month" ? handleNextMonth : handleNextWeek}>
               <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
-          <div className="flex gap-1">
+          <div className="flex gap-0.5 shrink-0">
             <Button
               variant={view === "month" ? "default" : "ghost"}
               size="sm"
+              className="text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
               onClick={() => setView("month")}
             >
               Month
@@ -392,6 +398,7 @@ export default function Calendar() {
             <Button
               variant={view === "week" ? "default" : "ghost"}
               size="sm"
+              className="text-xs sm:text-sm px-2 sm:px-3 h-7 sm:h-8"
               onClick={() => setView("week")}
             >
               Week
