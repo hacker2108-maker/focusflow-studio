@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play,
@@ -12,27 +12,14 @@ import {
   Car,
   PersonStanding,
   Bike,
+  Navigation,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useActivityStore, type Activity } from "@/store/activityStore";
-import { format, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-
-// Dynamic import for Leaflet (client-side only)
-import { MapContainer, TileLayer, Polyline, Marker, useMap } from "react-leaflet";
-import "leaflet/dist/leaflet.css";
-import L from "leaflet";
-
-// Fix Leaflet default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
 
 const activityTypes = [
   { type: "run" as const, label: "Run", icon: Footprints, color: "#EF4444" },
@@ -40,16 +27,6 @@ const activityTypes = [
   { type: "cycle" as const, label: "Cycle", icon: Bike, color: "#3B82F6" },
   { type: "drive" as const, label: "Drive", icon: Car, color: "#8B5CF6" },
 ];
-
-function MapUpdater({ center }: { center: [number, number] | null }) {
-  const map = useMap();
-  useEffect(() => {
-    if (center) {
-      map.setView(center, 16);
-    }
-  }, [center, map]);
-  return null;
-}
 
 function formatDuration(minutes: number): string {
   const hrs = Math.floor(minutes / 60);
@@ -76,14 +53,14 @@ export default function Activity() {
 
   const [selectedType, setSelectedType] = useState<Activity["type"]>("run");
   const [elapsedTime, setElapsedTime] = useState(0);
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
+  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
 
   // Get current location on mount
   useEffect(() => {
     if ("geolocation" in navigator) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setMapCenter([position.coords.latitude, position.coords.longitude]);
+          setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
           updatePosition(position.coords.latitude, position.coords.longitude);
         },
         (error) => {
@@ -103,7 +80,7 @@ export default function Activity() {
       watchId = navigator.geolocation.watchPosition(
         (position) => {
           updatePosition(position.coords.latitude, position.coords.longitude);
-          setMapCenter([position.coords.latitude, position.coords.longitude]);
+          setMapCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
         },
         (error) => console.error("Watch position error:", error),
         { enableHighAccuracy: true, maximumAge: 1000, timeout: 5000 }
@@ -153,6 +130,11 @@ export default function Activity() {
   const totalCalories = activities.reduce((sum, a) => sum + (a.caloriesBurned || 0), 0);
   const totalDuration = activities.reduce((sum, a) => sum + a.durationMinutes, 0);
 
+  // Build OpenStreetMap iframe URL
+  const mapUrl = mapCenter
+    ? `https://www.openstreetmap.org/export/embed.html?bbox=${mapCenter.lng - 0.01}%2C${mapCenter.lat - 0.01}%2C${mapCenter.lng + 0.01}%2C${mapCenter.lat + 0.01}&layer=mapnik&marker=${mapCenter.lat}%2C${mapCenter.lng}`
+    : null;
+
   return (
     <div className="space-y-6 animate-fade-in">
       <header>
@@ -163,41 +145,35 @@ export default function Activity() {
       {/* Map */}
       <Card className="glass overflow-hidden">
         <div className="h-[300px] relative">
-          {mapCenter ? (
-            <MapContainer
-              center={mapCenter}
-              zoom={16}
-              style={{ height: "100%", width: "100%" }}
-              zoomControl={false}
-            >
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              <MapUpdater center={mapCenter} />
-              {currentPosition ? (
-                <Marker position={[currentPosition.lat, currentPosition.lng]} />
-              ) : null}
-              {routePoints.length > 1 ? (
-                <Polyline
-                  positions={routePoints.map((p) => [p.lat, p.lng] as [number, number])}
-                  color={activityColor}
-                  weight={4}
-                />
-              ) : null}
-            </MapContainer>
+          {mapUrl ? (
+            <iframe
+              src={mapUrl}
+              className="w-full h-full border-0"
+              title="Activity Map"
+              loading="lazy"
+            />
           ) : (
             <div className="h-full flex items-center justify-center bg-secondary">
               <div className="text-center">
-                <MapPin className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                <p className="text-sm text-muted-foreground">Loading map...</p>
+                <MapPin className="w-8 h-8 mx-auto text-muted-foreground mb-2 animate-pulse" />
+                <p className="text-sm text-muted-foreground">Getting your location...</p>
               </div>
+            </div>
+          )}
+
+          {/* Current position indicator */}
+          {currentPosition && isTracking && (
+            <div className="absolute bottom-4 right-4 glass-strong rounded-xl px-3 py-2 flex items-center gap-2">
+              <Navigation className="w-4 h-4 text-primary animate-pulse" />
+              <span className="text-xs font-medium">
+                {currentPosition.lat.toFixed(4)}, {currentPosition.lng.toFixed(4)}
+              </span>
             </div>
           )}
 
           {/* Overlay stats while tracking */}
           {isTracking && (
-            <div className="absolute top-4 left-4 right-4 flex gap-2">
+            <div className="absolute top-4 left-4 right-4 flex gap-2 flex-wrap">
               <div className="glass-strong rounded-xl px-4 py-2 flex items-center gap-2">
                 <Timer className="w-4 h-4 text-primary" />
                 <span className="font-mono font-bold">{formatDuration(elapsedTime)}</span>
