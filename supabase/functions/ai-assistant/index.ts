@@ -104,6 +104,14 @@ To create a journal entry, respond with:
 - Activity summaries
 - Provide personalized recommendations
 
+📝 NOTES:
+- Create, view, and manage notes (like Apple Notes)
+- Quick notes and reminders
+To create a note, respond with:
+\`\`\`json
+{"action": "create_note", "note": {"title": "Note Title", "content": "Note content here..."}}
+\`\`\`
+
 💪 WORKOUTS:
 - Start guided workouts
 - Track workout progress

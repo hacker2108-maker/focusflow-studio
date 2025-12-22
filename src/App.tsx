@@ -14,6 +14,7 @@ import Settings from "./pages/Settings";
 import Journal from "./pages/Journal";
 import Calendar from "./pages/Calendar";
 import Activity from "./pages/Activity";
+import Notes from "./pages/Notes";
 import Auth from "./pages/Auth";
 import NotFound from "./pages/NotFound";
 
@@ -40,6 +41,7 @@ const App = () => (
                       <Route path="/journal" element={<Journal />} />
                       <Route path="/calendar" element={<Calendar />} />
                       <Route path="/activity" element={<Activity />} />
+                      <Route path="/notes" element={<Notes />} />
                       <Route path="/insights" element={<Insights />} />
                       <Route path="/settings" element={<Settings />} />
                       <Route path="*" element={<NotFound />} />
