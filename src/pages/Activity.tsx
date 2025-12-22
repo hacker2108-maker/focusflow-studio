@@ -49,11 +49,18 @@ export default function Activity() {
     startTracking,
     stopTracking,
     updatePosition,
+    fetchActivities,
+    isLoading,
   } = useActivityStore();
 
   const [selectedType, setSelectedType] = useState<Activity["type"]>("run");
   const [elapsedTime, setElapsedTime] = useState(0);
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
+
+  // Fetch activities from database on mount
+  useEffect(() => {
+    fetchActivities();
+  }, [fetchActivities]);
 
   // Get current location on mount
   useEffect(() => {

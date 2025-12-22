@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      activities: {
+        Row: {
+          avg_speed_kmh: number | null
+          calories_burned: number | null
+          created_at: string
+          date: string
+          distance_km: number
+          duration_minutes: number
+          id: string
+          route_points: Json | null
+          steps: number | null
+          type: string
+          user_id: string
+        }
+        Insert: {
+          avg_speed_kmh?: number | null
+          calories_burned?: number | null
+          created_at?: string
+          date: string
+          distance_km?: number
+          duration_minutes?: number
+          id?: string
+          route_points?: Json | null
+          steps?: number | null
+          type?: string
+          user_id: string
+        }
+        Update: {
+          avg_speed_kmh?: number | null
+          calories_burned?: number | null
+          created_at?: string
+          date?: string
+          distance_km?: number
+          duration_minutes?: number
+          id?: string
+          route_points?: Json | null
+          steps?: number | null
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       calendar_events: {
         Row: {
           color: string | null
