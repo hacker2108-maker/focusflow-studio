@@ -43,6 +43,7 @@ export default function Habits() {
       schedule: data.schedule,
       goalType: data.goalType,
       goalTarget: data.goalTarget,
+      reminderTime: data.reminderTime,
     };
 
     if (editingHabit) {
@@ -50,7 +51,7 @@ export default function Habits() {
       toast.success("Habit updated");
     } else {
       addHabit(habitData);
-      toast.success("Habit created");
+      toast.success("Habit created" + (data.reminderTime ? ` with reminder at ${data.reminderTime}` : ""));
       setFilter("active");
     }
     

@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { 
   Dumbbell, Book, Droplets, Moon, Sun, Coffee, Heart, Brain, 
   Footprints, Apple, Pill, Music, Pencil, Code, Languages,
-  Flame, Sparkles, Check
+  Flame, Sparkles, Check, Bell
 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { HABIT_COLORS, DAY_NAMES, type Habit } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -33,6 +34,7 @@ export interface HabitFormData {
   };
   goalType: "check" | "count";
   goalTarget?: number;
+  reminderTime?: string;
 }
 
 const HABIT_TEMPLATES = [
@@ -95,6 +97,8 @@ export function HabitFormDialog({ open, onOpenChange, editingHabit, onSave }: Ha
   const [selectedIcon, setSelectedIcon] = useState<string | null>(null);
   const [goalType, setGoalType] = useState<"check" | "count">(editingHabit?.goalType || "check");
   const [goalTarget, setGoalTarget] = useState(editingHabit?.goalTarget || 1);
+  const [reminderEnabled, setReminderEnabled] = useState(!!editingHabit?.reminderTime);
+  const [reminderTime, setReminderTime] = useState(editingHabit?.reminderTime || "09:00");
 
   const resetForm = () => {
     setStep("template");
@@ -107,6 +111,8 @@ export function HabitFormDialog({ open, onOpenChange, editingHabit, onSave }: Ha
     setSelectedIcon(null);
     setGoalType("check");
     setGoalTarget(1);
+    setReminderEnabled(false);
+    setReminderTime("09:00");
   };
 
   const handleOpenChange = (isOpen: boolean) => {
@@ -137,6 +143,7 @@ export function HabitFormDialog({ open, onOpenChange, editingHabit, onSave }: Ha
       },
       goalType,
       goalTarget: goalType === "count" ? goalTarget : undefined,
+      reminderTime: reminderEnabled ? reminderTime : undefined,
     });
     
     resetForm();
@@ -510,6 +517,38 @@ export function HabitFormDialog({ open, onOpenChange, editingHabit, onSave }: Ha
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Reminder Section */}
+                <div className="pt-4 border-t border-border/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bell className="w-4 h-4 text-primary" />
+                      <Label className="text-sm font-medium">Daily Reminder</Label>
+                    </div>
+                    <Switch
+                      checked={reminderEnabled}
+                      onCheckedChange={setReminderEnabled}
+                    />
+                  </div>
+                  
+                  {reminderEnabled && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                    >
+                      <Input
+                        type="time"
+                        value={reminderTime}
+                        onChange={(e) => setReminderTime(e.target.value)}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        You'll receive a notification at this time when the habit is due
+                      </p>
+                    </motion.div>
+                  )}
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
