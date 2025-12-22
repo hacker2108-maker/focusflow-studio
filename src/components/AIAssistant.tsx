@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Bot, X, Send, Loader2, Sparkles, CalendarPlus, Target } from "lucide-react";
+import { Bot, X, Send, Loader2, Sparkles, CalendarPlus, Target, Mic, MicOff, Volume2, VolumeX } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,7 @@ import { format, subDays, addDays } from "date-fns";
 import { calculateStreak, calculateCompletionRate } from "@/lib/utils";
 import { toast } from "sonner";
 import { HABIT_COLORS } from "@/types";
+import { useSpeech } from "@/hooks/useSpeech";
 
 interface Message {
   role: "user" | "assistant";
@@ -41,12 +42,43 @@ export function AIAssistant() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const { habits, logs, addHabit } = useHabitStore();
   const { sessions } = useFocusStore();
   const { events, addEvent } = useCalendarStore();
   const { entries: journalEntries } = useJournalStore();
+
+  // Speech hook for voice input/output
+  const { 
+    isListening, 
+    isSpeaking, 
+    isSupported, 
+    transcript,
+    startListening, 
+    stopListening, 
+    speak,
+    stopSpeaking 
+  } = useSpeech({
+    onResult: (text) => {
+      setInput(text);
+    },
+  });
+
+  // Auto-send when user stops speaking
+  const handleVoiceToggle = () => {
+    if (isListening) {
+      stopListening();
+      // If we have a transcript, send the message
+      if (input.trim()) {
+        setTimeout(() => sendMessage(), 100);
+      }
+    } else {
+      setInput("");
+      startListening();
+    }
+  };
   
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -288,6 +320,14 @@ export function AIAssistant() {
       // After streaming is complete, try to extract and create event/habit
       if (assistantContent) {
         tryExtractAndCreateFromAI(assistantContent);
+        
+        // Speak the response if voice is enabled
+        if (voiceEnabled) {
+          const cleanedContent = cleanDisplayContent(assistantContent);
+          if (cleanedContent) {
+            speak(cleanedContent);
+          }
+        }
       }
     } catch (error) {
       console.error("AI error:", error);
@@ -412,9 +452,64 @@ export function AIAssistant() {
               
               {/* Input */}
               <div className="p-4 border-t border-border/50">
+                {/* Voice controls */}
+                {isSupported && (
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={isListening ? "destructive" : "outline"}
+                        onClick={handleVoiceToggle}
+                        disabled={isLoading || isSpeaking}
+                        className="gap-2"
+                      >
+                        {isListening ? (
+                          <>
+                            <MicOff className="w-4 h-4" />
+                            Stop
+                          </>
+                        ) : (
+                          <>
+                            <Mic className="w-4 h-4" />
+                            Speak
+                          </>
+                        )}
+                      </Button>
+                      {isListening && (
+                        <span className="text-xs text-muted-foreground animate-pulse">
+                          Listening...
+                        </span>
+                      )}
+                      {isSpeaking && (
+                        <span className="text-xs text-primary animate-pulse">
+                          Speaking...
+                        </span>
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => {
+                        if (isSpeaking) stopSpeaking();
+                        setVoiceEnabled(!voiceEnabled);
+                      }}
+                      title={voiceEnabled ? "Disable voice responses" : "Enable voice responses"}
+                    >
+                      {voiceEnabled ? (
+                        <Volume2 className="w-4 h-4 text-primary" />
+                      ) : (
+                        <VolumeX className="w-4 h-4 text-muted-foreground" />
+                      )}
+                    </Button>
+                  </div>
+                )}
+                
                 <form
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (isListening) stopListening();
                     sendMessage();
                   }}
                   className="flex gap-2"
@@ -422,7 +517,7 @@ export function AIAssistant() {
                   <Input
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
-                    placeholder="Ask me anything..."
+                    placeholder={isListening ? "Listening..." : "Ask me anything..."}
                     className="flex-1"
                     disabled={isLoading}
                   />
