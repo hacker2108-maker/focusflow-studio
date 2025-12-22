@@ -24,6 +24,8 @@ import { cn } from "@/lib/utils";
 import { ActivityCharts } from "@/components/activity/ActivityCharts";
 import { NavigationCard } from "@/components/activity/NavigationCard";
 import { AchievementsBadges } from "@/components/activity/AchievementsBadges";
+import { SocialLeaderboard } from "@/components/activity/SocialLeaderboard";
+import { WorkoutPlans } from "@/components/activity/WorkoutPlans";
 
 const activityTypes = [
   { type: "run" as const, label: "Run", icon: Footprints, color: "#EF4444" },
@@ -156,11 +158,13 @@ export default function Activity() {
 
       {/* Tab Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="track">Track</TabsTrigger>
-          <TabsTrigger value="navigate">Navigate</TabsTrigger>
-          <TabsTrigger value="stats">Stats</TabsTrigger>
-          <TabsTrigger value="achievements">Badges</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="track" className="text-xs">Track</TabsTrigger>
+          <TabsTrigger value="workouts" className="text-xs">Workouts</TabsTrigger>
+          <TabsTrigger value="navigate" className="text-xs">Navigate</TabsTrigger>
+          <TabsTrigger value="stats" className="text-xs">Stats</TabsTrigger>
+          <TabsTrigger value="social" className="text-xs">Social</TabsTrigger>
+          <TabsTrigger value="achievements" className="text-xs">Badges</TabsTrigger>
         </TabsList>
 
         <TabsContent value="track" className="space-y-6 mt-4">
@@ -463,6 +467,14 @@ export default function Activity() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="workouts" className="space-y-6 mt-4">
+          <WorkoutPlans />
+        </TabsContent>
+
+        <TabsContent value="social" className="space-y-6 mt-4">
+          <SocialLeaderboard />
         </TabsContent>
       </Tabs>
     </div>

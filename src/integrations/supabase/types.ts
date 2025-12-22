@@ -160,6 +160,30 @@ export type Database = {
         }
         Relationships: []
       }
+      friends: {
+        Row: {
+          created_at: string
+          friend_id: string
+          id: string
+          status: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          friend_id: string
+          id?: string
+          status?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          friend_id?: string
+          id?: string
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       habit_logs: {
         Row: {
           created_at: string
@@ -291,6 +315,45 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          bio: string | null
+          created_at: string
+          display_name: string | null
+          id: string
+          total_activities: number | null
+          total_calories: number | null
+          total_distance_km: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          total_activities?: number | null
+          total_calories?: number | null
+          total_distance_km?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          bio?: string | null
+          created_at?: string
+          display_name?: string | null
+          id?: string
+          total_activities?: number | null
+          total_calories?: number | null
+          total_distance_km?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string
@@ -326,6 +389,89 @@ export type Database = {
           week_starts_monday?: boolean | null
         }
         Relationships: []
+      }
+      workout_plans: {
+        Row: {
+          category: string
+          created_at: string
+          creator_id: string | null
+          description: string | null
+          difficulty: string
+          duration_minutes: number
+          exercises: Json
+          id: string
+          image_url: string | null
+          is_public: boolean | null
+          title: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          difficulty?: string
+          duration_minutes?: number
+          exercises?: Json
+          id?: string
+          image_url?: string | null
+          is_public?: boolean | null
+          title: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          creator_id?: string | null
+          description?: string | null
+          difficulty?: string
+          duration_minutes?: number
+          exercises?: Json
+          id?: string
+          image_url?: string | null
+          is_public?: boolean | null
+          title?: string
+        }
+        Relationships: []
+      }
+      workout_sessions: {
+        Row: {
+          completed_at: string | null
+          exercises_completed: number | null
+          id: string
+          plan_id: string | null
+          started_at: string
+          status: string
+          total_exercises: number | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          exercises_completed?: number | null
+          id?: string
+          plan_id?: string | null
+          started_at?: string
+          status?: string
+          total_exercises?: number | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          exercises_completed?: number | null
+          id?: string
+          plan_id?: string | null
+          started_at?: string
+          status?: string
+          total_exercises?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workout_sessions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "workout_plans"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
