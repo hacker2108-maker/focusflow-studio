@@ -173,7 +173,7 @@ export function AIAssistant() {
       {/* FAB Button */}
       <motion.button
         className={cn(
-          "fixed bottom-20 right-4 md:bottom-6 md:right-6 z-50",
+          "fixed bottom-28 right-4 md:bottom-6 md:right-6 z-40",
           "w-14 h-14 rounded-full gradient-primary shadow-glow",
           "flex items-center justify-center",
           "hover:scale-110 transition-transform"
