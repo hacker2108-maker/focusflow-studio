@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { BottomNav, Sidebar } from "./Navigation";
 import { FocusMiniBanner } from "@/components/FocusMiniBanner";
+import { AIAssistant } from "@/components/AIAssistant";
 import { useFocusStore } from "@/store/focusStore";
 import { useSettingsStore } from "@/store/settingsStore";
 
@@ -37,6 +38,7 @@ export function AppLayout({ children }: AppLayoutProps) {
         </div>
       </main>
       <BottomNav />
+      <AIAssistant />
     </div>
   );
 }
