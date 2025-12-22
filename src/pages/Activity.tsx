@@ -161,7 +161,7 @@ export default function Activity() {
     : null;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-24">
       {/* Header with gradient */}
       <header className="relative">
         <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent rounded-3xl blur-3xl -z-10" />
@@ -199,8 +199,8 @@ export default function Activity() {
 
       {/* Tab Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-          <TabsList className="inline-flex w-auto min-w-full md:grid md:grid-cols-6 gap-1 bg-secondary/50 p-1">
+        <div className="overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide touch-pan-x">
+          <TabsList className="inline-flex w-max gap-1 bg-secondary/50 p-1">
             <TabsTrigger value="track" className="text-xs px-4 whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Play className="w-3 h-3 mr-1.5" />
               Track
