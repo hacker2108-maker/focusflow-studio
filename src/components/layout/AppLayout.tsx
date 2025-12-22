@@ -30,10 +30,10 @@ export function AppLayout({ children }: AppLayoutProps) {
   }, [settings.theme]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background pt-[env(safe-area-inset-top)]">
       <Sidebar />
       {timer.isRunning && <FocusMiniBanner />}
-      <main className={`md:ml-64 pb-24 md:pb-6 ${timer.isRunning ? "pt-14 md:pt-0" : "pt-0"}`}>
+      <main className={`md:ml-64 pb-28 md:pb-6 ${timer.isRunning ? "pt-14 md:pt-0" : "pt-0"}`}>
         <div className="max-w-4xl mx-auto px-4 py-4 md:py-6">
           {children}
         </div>
