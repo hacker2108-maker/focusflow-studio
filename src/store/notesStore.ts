@@ -12,8 +12,12 @@ export interface Note {
   updatedAt: number;
 }
 
+export const DEFAULT_FOLDERS = ["Notes", "Work", "Personal", "Ideas", "Archive"];
+
 interface NotesState {
   notes: Note[];
+  folders: string[];
+  selectedFolder: string | null;
   isLoading: boolean;
   selectedNote: Note | null;
   
@@ -24,10 +28,16 @@ interface NotesState {
   deleteNote: (id: string) => Promise<void>;
   setSelectedNote: (note: Note | null) => void;
   togglePin: (id: string) => Promise<void>;
+  setSelectedFolder: (folder: string | null) => void;
+  addFolder: (folder: string) => void;
+  deleteFolder: (folder: string) => void;
+  moveToFolder: (noteId: string, folder: string) => Promise<void>;
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
   notes: [],
+  folders: [...DEFAULT_FOLDERS],
+  selectedFolder: null,
   isLoading: false,
   selectedNote: null,
 
@@ -63,7 +73,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
         updatedAt: new Date(row.updated_at).getTime(),
       }));
 
-      set({ notes, isLoading: false });
+      // Extract unique folders from notes and merge with defaults
+      const noteFolders = new Set(notes.map(n => n.folder));
+      const allFolders = new Set([...DEFAULT_FOLDERS, ...noteFolders]);
+      
+      set({ notes, folders: Array.from(allFolders), isLoading: false });
     } catch (error) {
       console.error("Error fetching notes:", error);
       set({ isLoading: false });
@@ -75,13 +89,15 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
 
+      const folder = noteData.folder || get().selectedFolder || "Notes";
+
       const { data, error } = await supabase
         .from("notes")
         .insert({
           user_id: user.id,
           title: noteData.title || "Untitled",
           content: noteData.content || "",
-          folder: noteData.folder || "Notes",
+          folder: folder,
           is_pinned: noteData.isPinned || false,
           color: noteData.color || "#FFFFFF",
         })
@@ -174,5 +190,29 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     if (note) {
       await get().updateNote(id, { isPinned: !note.isPinned });
     }
+  },
+
+  setSelectedFolder: (folder) => {
+    set({ selectedFolder: folder });
+  },
+
+  addFolder: (folder) => {
+    set((state) => ({
+      folders: state.folders.includes(folder) 
+        ? state.folders 
+        : [...state.folders, folder]
+    }));
+  },
+
+  deleteFolder: (folder) => {
+    if (DEFAULT_FOLDERS.includes(folder)) return; // Can't delete default folders
+    set((state) => ({
+      folders: state.folders.filter(f => f !== folder),
+      selectedFolder: state.selectedFolder === folder ? null : state.selectedFolder
+    }));
+  },
+
+  moveToFolder: async (noteId, folder) => {
+    await get().updateNote(noteId, { folder });
   },
 }));
