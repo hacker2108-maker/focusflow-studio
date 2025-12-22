@@ -158,14 +158,16 @@ export default function Activity() {
 
       {/* Tab Navigation */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-6">
-          <TabsTrigger value="track" className="text-xs">Track</TabsTrigger>
-          <TabsTrigger value="workouts" className="text-xs">Workouts</TabsTrigger>
-          <TabsTrigger value="navigate" className="text-xs">Navigate</TabsTrigger>
-          <TabsTrigger value="stats" className="text-xs">Stats</TabsTrigger>
-          <TabsTrigger value="social" className="text-xs">Social</TabsTrigger>
-          <TabsTrigger value="achievements" className="text-xs">Badges</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2 -mx-2 px-2">
+          <TabsList className="inline-flex w-auto min-w-full md:grid md:grid-cols-6 gap-1">
+            <TabsTrigger value="track" className="text-xs px-3 whitespace-nowrap">Track</TabsTrigger>
+            <TabsTrigger value="workouts" className="text-xs px-3 whitespace-nowrap">Workouts</TabsTrigger>
+            <TabsTrigger value="navigate" className="text-xs px-3 whitespace-nowrap">Navigate</TabsTrigger>
+            <TabsTrigger value="stats" className="text-xs px-3 whitespace-nowrap">Stats</TabsTrigger>
+            <TabsTrigger value="social" className="text-xs px-3 whitespace-nowrap">Social</TabsTrigger>
+            <TabsTrigger value="achievements" className="text-xs px-3 whitespace-nowrap">Badges</TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value="track" className="space-y-6 mt-4">
           {/* Map */}
