@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff, Cloud, CloudOff, Palette, Globe, User, Shield, Smartphone } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff, Cloud, CloudOff, Palette, Globe, User, Shield, Smartphone, ChevronRight } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
@@ -13,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { toast } from "sonner";
 import { Capacitor } from "@capacitor/core";
 
@@ -32,6 +33,20 @@ export default function Settings() {
   const [weatherCity, setWeatherCity] = useState(() => 
     localStorage.getItem("weather-city") || ""
   );
+  const [profile, setProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from("profiles")
+        .select("display_name, avatar_url")
+        .eq("user_id", user.id)
+        .single()
+        .then(({ data }) => {
+          if (data) setProfile(data);
+        });
+    }
+  }, [user]);
 
   const isNative = Capacitor.isNativePlatform();
 
@@ -209,21 +224,33 @@ export default function Settings() {
       </header>
 
       {/* Account */}
+      <Link to="/profile">
+        <Card className="glass hover:border-primary/30 transition-colors cursor-pointer">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <Avatar className="w-12 h-12 border-2 border-primary/20">
+                <AvatarImage src={profile?.avatar_url || undefined} alt="Profile" />
+                <AvatarFallback className="bg-primary/10 text-primary">
+                  {profile?.display_name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-1">
+                <p className="font-medium">{profile?.display_name || "Set up your profile"}</p>
+                <p className="text-sm text-muted-foreground">{user?.email}</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-muted-foreground" />
+            </div>
+          </CardContent>
+        </Card>
+      </Link>
+
+      {/* Sign Out */}
       <Card className="glass">
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
-              <User className="w-6 h-6 text-primary-foreground" />
-            </div>
-            <div className="flex-1">
-              <p className="font-medium">Account</p>
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
-            </div>
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
-            </Button>
-          </div>
+        <CardContent className="p-4">
+          <Button variant="outline" onClick={handleSignOut} className="w-full justify-center">
+            <LogOut className="w-4 h-4 mr-2" />
+            Sign Out
+          </Button>
         </CardContent>
       </Card>
 
