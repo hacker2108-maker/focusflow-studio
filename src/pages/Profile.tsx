@@ -35,31 +35,58 @@ export default function Profile() {
 
   useEffect(() => {
     if (user) {
-      fetchProfile();
+      fetchOrCreateProfile();
     }
   }, [user]);
 
-  const fetchProfile = async () => {
+  const fetchOrCreateProfile = async () => {
     if (!user) return;
     
     try {
+      // First try to get existing profile
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("user_id", user.id)
-        .single();
+        .maybeSingle();
 
-      if (error && error.code !== "PGRST116") {
+      if (error) {
         throw error;
       }
 
       if (data) {
+        // Profile exists, use it
         setProfile(data);
         setDisplayName(data.display_name || "");
         setBio(data.bio || "");
+      } else {
+        // No profile exists, create one
+        const newProfile = {
+          user_id: user.id,
+          display_name: user.email?.split("@")[0] || "User",
+          bio: null,
+          avatar_url: null,
+          total_activities: 0,
+          total_distance_km: 0,
+          total_calories: 0,
+        };
+
+        const { data: createdProfile, error: createError } = await supabase
+          .from("profiles")
+          .insert(newProfile)
+          .select()
+          .single();
+
+        if (createError) {
+          throw createError;
+        }
+
+        setProfile(createdProfile);
+        setDisplayName(createdProfile.display_name || "");
+        setBio(createdProfile.bio || "");
       }
     } catch (error) {
-      console.error("Error fetching profile:", error);
+      console.error("Error fetching/creating profile:", error);
       toast.error("Failed to load profile");
     } finally {
       setLoading(false);
@@ -67,7 +94,7 @@ export default function Profile() {
   };
 
   const handleSaveProfile = async () => {
-    if (!user) return;
+    if (!user || !profile) return;
     
     setSaving(true);
     try {
@@ -120,15 +147,24 @@ export default function Profile() {
     setUploading(true);
     try {
       // Create unique file path
-      const fileExt = file.name.split(".").pop();
+      const fileExt = file.name.split(".").pop()?.toLowerCase() || "jpg";
       const filePath = `${user.id}/avatar.${fileExt}`;
+
+      // First try to remove old avatar if exists
+      await supabase.storage.from("avatars").remove([filePath]);
 
       // Upload to storage
       const { error: uploadError } = await supabase.storage
         .from("avatars")
-        .upload(filePath, file, { upsert: true });
+        .upload(filePath, file, { 
+          cacheControl: "3600",
+          upsert: true 
+        });
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        throw uploadError;
+      }
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
@@ -151,9 +187,9 @@ export default function Profile() {
 
       setProfile(prev => prev ? { ...prev, avatar_url: avatarUrl } : null);
       toast.success("Avatar updated successfully");
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error uploading avatar:", error);
-      toast.error("Failed to upload avatar");
+      toast.error(error.message || "Failed to upload avatar");
     } finally {
       setUploading(false);
       // Reset file input

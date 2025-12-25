@@ -1,7 +1,8 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { supabase } from "@/integrations/supabase/client";
 import type { FocusSession, FocusTimer, FocusPreset } from "@/types";
-import { generateId, getToday } from "@/lib/utils";
+import { getToday } from "@/lib/utils";
 
 const DEFAULT_PRESET: FocusPreset = {
   workMinutes: 25,
@@ -18,13 +19,14 @@ interface FocusState {
   sessions: FocusSession[];
   timer: FocusTimer;
   preset: FocusPreset;
+  isLoading: boolean;
   
   // Timer Actions
   startTimer: (mode: "pomodoro" | "deepFocus", task?: string, customDuration?: number) => void;
   pauseTimer: () => void;
   resumeTimer: () => void;
   resetTimer: () => void;
-  completeSession: (note?: string) => void;
+  completeSession: (note?: string) => Promise<void>;
   skipBreak: () => void;
   
   // Get current time remaining
@@ -35,8 +37,9 @@ interface FocusState {
   updatePreset: (preset: Partial<FocusPreset>) => void;
   
   // Session Actions
-  addSession: (session: Omit<FocusSession, "id">) => void;
-  deleteSession: (id: string) => void;
+  fetchSessions: () => Promise<void>;
+  addSession: (session: Omit<FocusSession, "id">) => Promise<void>;
+  deleteSession: (id: string) => Promise<void>;
   
   // Data management
   importData: (sessions: FocusSession[]) => void;
@@ -62,6 +65,45 @@ export const useFocusStore = create<FocusState>()(
       sessions: [],
       timer: getInitialTimer(),
       preset: DEFAULT_PRESET,
+      isLoading: false,
+
+      fetchSessions: async () => {
+        set({ isLoading: true });
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) {
+            set({ isLoading: false });
+            return;
+          }
+
+          const { data, error } = await supabase
+            .from("focus_sessions")
+            .select("*")
+            .order("created_at", { ascending: false });
+
+          if (error) {
+            console.error("Error fetching focus sessions:", error);
+            set({ isLoading: false });
+            return;
+          }
+
+          const sessions: FocusSession[] = (data || []).map((row) => ({
+            id: row.id,
+            date: row.date,
+            startTime: row.start_time,
+            durationMinutes: row.duration_minutes,
+            mode: row.mode as "pomodoro" | "deepFocus",
+            task: row.task || undefined,
+            note: row.note || undefined,
+            completed: row.completed || false,
+          }));
+
+          set({ sessions, isLoading: false });
+        } catch (error) {
+          console.error("Error fetching focus sessions:", error);
+          set({ isLoading: false });
+        }
+      },
 
       startTimer: (mode, task, customDuration) => {
         const { preset } = get();
@@ -120,15 +162,14 @@ export const useFocusStore = create<FocusState>()(
         set({ timer: getInitialTimer() });
       },
 
-      completeSession: (note) => {
-        const { timer, preset, sessions } = get();
+      completeSession: async (note) => {
+        const { timer, preset } = get();
         const elapsed = get().getElapsedTime();
         const durationMinutes = Math.floor(elapsed / 60);
 
-        // Log the session
+        // Log the session to database
         if (durationMinutes > 0) {
-          const session: FocusSession = {
-            id: generateId(),
+          await get().addSession({
             date: getToday(),
             startTime: timer.startTimestamp || Date.now(),
             durationMinutes,
@@ -136,8 +177,7 @@ export const useFocusStore = create<FocusState>()(
             task: timer.task,
             note,
             completed: true,
-          };
-          set({ sessions: [...sessions, session] });
+          });
         }
 
         // Handle pomodoro phases
@@ -221,18 +261,63 @@ export const useFocusStore = create<FocusState>()(
         }));
       },
 
-      addSession: (sessionData) => {
-        const session: FocusSession = {
-          ...sessionData,
-          id: generateId(),
-        };
-        set((state) => ({ sessions: [...state.sessions, session] }));
+      addSession: async (sessionData) => {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return;
+
+          const { data, error } = await supabase
+            .from("focus_sessions")
+            .insert({
+              user_id: user.id,
+              date: sessionData.date,
+              start_time: sessionData.startTime,
+              duration_minutes: sessionData.durationMinutes,
+              mode: sessionData.mode,
+              task: sessionData.task || null,
+              note: sessionData.note || null,
+              completed: sessionData.completed,
+            })
+            .select()
+            .single();
+
+          if (error) {
+            console.error("Error adding focus session:", error);
+            return;
+          }
+
+          const newSession: FocusSession = {
+            id: data.id,
+            date: data.date,
+            startTime: data.start_time,
+            durationMinutes: data.duration_minutes,
+            mode: data.mode as "pomodoro" | "deepFocus",
+            task: data.task || undefined,
+            note: data.note || undefined,
+            completed: data.completed || false,
+          };
+
+          set((state) => ({ sessions: [...state.sessions, newSession] }));
+        } catch (error) {
+          console.error("Error adding focus session:", error);
+        }
       },
 
-      deleteSession: (id) => {
-        set((state) => ({
-          sessions: state.sessions.filter((s) => s.id !== id),
-        }));
+      deleteSession: async (id) => {
+        try {
+          const { error } = await supabase.from("focus_sessions").delete().eq("id", id);
+
+          if (error) {
+            console.error("Error deleting focus session:", error);
+            return;
+          }
+
+          set((state) => ({
+            sessions: state.sessions.filter((s) => s.id !== id),
+          }));
+        } catch (error) {
+          console.error("Error deleting focus session:", error);
+        }
       },
 
       importData: (sessions) => {
@@ -246,7 +331,6 @@ export const useFocusStore = create<FocusState>()(
     {
       name: "focushabit-focus",
       partialize: (state) => ({
-        sessions: state.sessions,
         timer: state.timer,
         preset: state.preset,
       }),
