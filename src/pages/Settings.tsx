@@ -72,10 +72,10 @@ export default function Settings() {
       try {
         const text = await file.text();
         const data = JSON.parse(text);
-        if (data.habits) useHabitStore.getState().importData(data.habits, data.logs || []);
+        // Note: Import now only works for local stores, cloud-synced data loads automatically
         if (data.sessions) useFocusStore.getState().importData(data.sessions);
         if (data.settings) useSettingsStore.getState().importData(data.settings, data.weeklyReviews || []);
-        toast.success("Data imported successfully");
+        toast.success("Data imported successfully. Refresh to load cloud data.");
       } catch {
         toast.error("Invalid backup file");
       }
