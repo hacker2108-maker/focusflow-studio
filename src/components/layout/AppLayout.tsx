@@ -33,7 +33,7 @@ export function AppLayout({ children }: AppLayoutProps) {
     <div className="min-h-screen bg-background pt-[max(env(safe-area-inset-top),44px)] md:pt-0">
       <Sidebar />
       {timer.isRunning && <FocusMiniBanner />}
-      <main className={`md:ml-64 pb-28 md:pb-6 ${timer.isRunning ? "pt-14 md:pt-0" : "pt-0"}`}>
+      <main className={`md:ml-64 pb-[max(calc(7rem+env(safe-area-inset-bottom)),7rem)] md:pb-6 ${timer.isRunning ? "pt-14 md:pt-0" : "pt-0"}`}>
         <SwipeableNavigation>
           <div className="max-w-4xl mx-auto px-4 py-4 md:py-6 min-h-screen">
             {children}

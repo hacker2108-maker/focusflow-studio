@@ -223,14 +223,14 @@ export default function Notes() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 bg-background z-50 md:relative md:z-auto"
+            className="fixed inset-0 bg-background z-50 md:relative md:z-auto pb-[max(env(safe-area-inset-bottom),20px)]"
             style={{
               backgroundColor:
                 selectedNote.color === "#FFFFFF" ? undefined : selectedNote.color,
             }}
           >
             {/* Editor Header */}
-            <div className="sticky top-0 z-10 glass-strong border-b border-border/50 px-4 py-3">
+            <div className="sticky top-0 z-10 glass-strong border-b border-border/50 px-4 py-3 pt-[max(env(safe-area-inset-top),12px)]">
               <div className="flex items-center justify-between">
                 <Button
                   variant="ghost"
