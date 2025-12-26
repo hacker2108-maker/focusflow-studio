@@ -5,6 +5,7 @@ import { FocusMiniBanner } from "@/components/FocusMiniBanner";
 import { AIAssistant } from "@/components/AIAssistant";
 import { useFocusStore } from "@/store/focusStore";
 import { useSettingsStore } from "@/store/settingsStore";
+import { useDataInitialization } from "@/hooks/useDataInitialization";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -13,6 +14,9 @@ interface AppLayoutProps {
 export function AppLayout({ children }: AppLayoutProps) {
   const { timer } = useFocusStore();
   const { settings } = useSettingsStore();
+  
+  // Initialize all store data when user is authenticated
+  useDataInitialization();
 
   // Initialize theme on mount
   useEffect(() => {

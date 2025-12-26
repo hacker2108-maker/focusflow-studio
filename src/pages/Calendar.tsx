@@ -191,7 +191,7 @@ export default function Calendar() {
       if (editingEvent.notificationId) {
         await cancelNotification(editingEvent.notificationId);
       }
-      updateEvent(editingEvent.id, eventData);
+      await updateEvent(editingEvent.id, eventData);
       
       if (reminder !== undefined && notificationsEnabled) {
         const notificationId = Date.now();
@@ -204,12 +204,12 @@ export default function Calendar() {
           `Starting ${reminder === 0 ? "now" : `in ${reminder} minutes`}`,
           eventDateTime
         );
-        updateEvent(editingEvent.id, { notificationId });
+        await updateEvent(editingEvent.id, { notificationId });
       }
     } else {
-      const newEvent = addEvent(eventData);
+      const newEvent = await addEvent(eventData);
       
-      if (reminder !== undefined && notificationsEnabled) {
+      if (newEvent && reminder !== undefined && notificationsEnabled) {
         const notificationId = Date.now();
         const eventDateTime = new Date(`${selectedDate}T${startTime}`);
         eventDateTime.setMinutes(eventDateTime.getMinutes() - reminder);
@@ -220,7 +220,7 @@ export default function Calendar() {
           `Starting ${reminder === 0 ? "now" : `in ${reminder} minutes`}`,
           eventDateTime
         );
-        updateEvent(newEvent.id, { notificationId });
+        await updateEvent(newEvent.id, { notificationId });
       }
     }
     
@@ -237,7 +237,7 @@ export default function Calendar() {
       if (eventToDelete.notificationId) {
         await cancelNotification(eventToDelete.notificationId);
       }
-      deleteEvent(eventToDelete.id);
+      await deleteEvent(eventToDelete.id);
     }
   };
   
