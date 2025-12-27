@@ -36,7 +36,7 @@ export default function Insights() {
     );
     return { 
       date, 
-      day: format(new Date(date), "EEE"),
+      day: format(new Date(date + "T12:00:00"), "EEE"),
       rate: activeHabits.length > 0 ? Math.round((completed.length / activeHabits.length) * 100) : 0,
       completed: completed.length,
       total: activeHabits.length
@@ -46,7 +46,7 @@ export default function Insights() {
   // Focus minutes per day
   const focusMinutes = days.map(date => ({
     date,
-    day: format(new Date(date), "EEE"),
+    day: format(new Date(date + "T12:00:00"), "EEE"),
     minutes: sessions.filter(s => s.date === date).reduce((acc, s) => acc + s.durationMinutes, 0)
   }));
 
@@ -111,7 +111,7 @@ export default function Insights() {
 
   // Find best day and worst day
   const dayCompletions = [0, 1, 2, 3, 4, 5, 6].map(dayNum => {
-    const daysOfWeek = days.filter(d => new Date(d).getDay() === dayNum);
+    const daysOfWeek = days.filter(d => new Date(d + "T12:00:00").getDay() === dayNum);
     const totalRate = daysOfWeek.reduce((acc, d) => {
       const dayData = habitCompletions.find(hc => hc.date === d);
       return acc + (dayData?.rate || 0);
