@@ -121,7 +121,7 @@ export default function Focus() {
   const phaseColor = timer.phase === "work" ? "text-primary" : "text-success";
 
   return (
-    <div className="space-y-6 animate-fade-in pb-32">
+    <div className="space-y-6 animate-fade-in pb-40">
       <header className="flex items-center justify-between">
         <div>
           <h1 className="text-display-sm">Focus</h1>
