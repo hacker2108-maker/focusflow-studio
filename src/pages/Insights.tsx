@@ -24,8 +24,10 @@ export default function Insights() {
   const [reviewOpen, setReviewOpen] = useState(false);
 
   const today = new Date();
+  // Generate dates using noon to avoid timezone issues
+  const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
   const days = Array.from({ length: range }, (_, i) => 
-    format(subDays(today, range - 1 - i), "yyyy-MM-dd")
+    format(subDays(todayNoon, range - 1 - i), "yyyy-MM-dd")
   );
   
   // Weekly habit completions
