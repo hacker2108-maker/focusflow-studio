@@ -191,14 +191,34 @@ export default function Settings() {
     }
   };
 
-  const handleClearAll = () => {
-    if (confirm("Are you sure? This will delete all your local data.")) {
-      clearHabits();
-      clearFocus();
-      clearSettings();
-      clearJournal?.();
-      clearCalendar?.();
-      toast.success("All data cleared");
+  const handleClearAll = async () => {
+    if (confirm("Are you sure? This will delete ALL your data from the cloud and locally. This cannot be undone.")) {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          // Delete all user data from Supabase
+          await Promise.all([
+            supabase.from("habits").delete().eq("user_id", user.id),
+            supabase.from("habit_logs").delete().eq("user_id", user.id),
+            supabase.from("focus_sessions").delete().eq("user_id", user.id),
+            supabase.from("journal_entries").delete().eq("user_id", user.id),
+            supabase.from("calendar_events").delete().eq("user_id", user.id),
+            supabase.from("notes").delete().eq("user_id", user.id),
+          ]);
+        }
+        
+        // Clear local stores
+        clearHabits();
+        clearFocus();
+        clearSettings();
+        clearJournal?.();
+        clearCalendar?.();
+        
+        toast.success("All data deleted");
+      } catch (error) {
+        console.error("Error clearing data:", error);
+        toast.error("Failed to delete some data");
+      }
     }
   };
 
