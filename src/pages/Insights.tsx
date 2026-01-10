@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
-import { addDays, format, startOfWeek, subDays, differenceInDays } from "date-fns";
-import { calculateStreak, calculateCompletionRate } from "@/lib/utils";
+import { format, startOfWeek, subDays } from "date-fns";
+import { calculateStreak, calculateCompletionRate, isHabitDueOnDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
 
@@ -30,36 +30,48 @@ export default function Insights() {
     format(subDays(todayNoon, range - 1 - i), "yyyy-MM-dd")
   );
   
-  // Weekly habit completions
-  const habitCompletions = days.map(date => {
-    const activeHabits = habits.filter(h => !h.archived);
-    const completed = activeHabits.filter(h => 
-      logs.some(l => l.habitId === h.id && l.date === date && l.status === "done")
+  // Weekly habit completions (count ONLY habits that are due on that date)
+  const habitCompletions = days.map((date) => {
+    const activeHabits = habits.filter((h) => !h.archived);
+    const dateObj = new Date(date + "T12:00:00");
+    const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, dateObj));
+    const completed = dueHabits.filter((h) =>
+      logs.some((l) => l.habitId === h.id && l.date === date && l.status === "done")
     );
-    return { 
-      date, 
-      day: format(new Date(date + "T12:00:00"), "EEE"),
-      rate: activeHabits.length > 0 ? Math.round((completed.length / activeHabits.length) * 100) : 0,
+
+    const total = dueHabits.length;
+    return {
+      date,
+      day: format(dateObj, "EEE"),
+      rate: total > 0 ? Math.round((completed.length / total) * 100) : 0,
       completed: completed.length,
-      total: activeHabits.length
+      total,
     };
   });
 
   // Focus minutes per day
-  const focusMinutes = days.map(date => ({
+  const focusMinutes = days.map((date) => ({
     date,
     day: format(new Date(date + "T12:00:00"), "EEE"),
-    minutes: sessions.filter(s => s.date === date).reduce((acc, s) => acc + s.durationMinutes, 0)
+    minutes: sessions
+      .filter((s) => s.date === date)
+      .reduce((acc, s) => acc + s.durationMinutes, 0),
   }));
 
   const totalFocus = focusMinutes.reduce((acc, d) => acc + d.minutes, 0);
-  const avgCompletion = Math.round(habitCompletions.reduce((acc, d) => acc + d.rate, 0) / range);
-  const totalSessions = sessions.filter(s => days.includes(s.date)).length;
+
+  // Average completion should ignore days where no habits were due (so weekends don't tank the score)
+  const completionDays = habitCompletions.filter((d) => d.total > 0);
+  const avgCompletion = completionDays.length
+    ? Math.round(completionDays.reduce((acc, d) => acc + d.rate, 0) / completionDays.length)
+    : 0;
+
+  const totalSessions = sessions.filter((s) => days.includes(s.date)).length;
 
   // Mood tracking from journal
   const moodCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    journalEntries.filter(e => days.includes(e.date)).forEach(e => {
+    journalEntries.filter((e) => days.includes(e.date)).forEach((e) => {
       if (e.mood) {
         counts[e.mood] = (counts[e.mood] || 0) + 1;
       }
@@ -93,21 +105,32 @@ export default function Insights() {
     return Math.round(score);
   }, [avgCompletion, totalFocus, range, habits, logs, journalEntries, days]);
 
-  // Trend calculation
-  const previousPeriod = Array.from({ length: range }, (_, i) => 
-    format(subDays(today, range * 2 - 1 - i), "yyyy-MM-dd")
+  // Trend calculation (compare against previous period using the same "due habits" logic)
+  const previousPeriod = Array.from({ length: range }, (_, i) =>
+    format(subDays(todayNoon, range * 2 - 1 - i), "yyyy-MM-dd")
   );
   
   const previousAvg = useMemo(() => {
-    const previousCompletions = previousPeriod.map(date => {
-      const activeHabits = habits.filter(h => !h.archived);
-      const completed = activeHabits.filter(h => 
-        logs.some(l => l.habitId === h.id && l.date === date && l.status === "done")
+    const activeHabits = habits.filter((h) => !h.archived);
+
+    const dayRates = previousPeriod.map((date) => {
+      const dateObj = new Date(date + "T12:00:00");
+      const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, dateObj));
+      const total = dueHabits.length;
+      if (total === 0) return null;
+
+      const completed = dueHabits.filter((h) =>
+        logs.some((l) => l.habitId === h.id && l.date === date && l.status === "done")
       );
-      return activeHabits.length > 0 ? (completed.length / activeHabits.length) * 100 : 0;
+
+      return (completed.length / total) * 100;
     });
-    return Math.round(previousCompletions.reduce((a, b) => a + b, 0) / range);
-  }, [previousPeriod, habits, logs, range]);
+
+    const validRates = dayRates.filter((r): r is number => r !== null);
+    return validRates.length
+      ? Math.round(validRates.reduce((a, b) => a + b, 0) / validRates.length)
+      : 0;
+  }, [previousPeriod, habits, logs]);
 
   const trend = avgCompletion - previousAvg;
 
