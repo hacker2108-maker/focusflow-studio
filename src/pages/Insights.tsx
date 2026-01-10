@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { BarChart3, TrendingUp, Target, Timer, Trophy, AlertCircle, Lightbulb, ChevronDown, Brain, Zap, Calendar } from "lucide-react";
+import { BarChart3, TrendingUp, Target, Timer, Trophy, AlertCircle, Lightbulb, ChevronDown, ChevronLeft, ChevronRight, Brain, Zap, Calendar } from "lucide-react";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
 import { useSettingsStore } from "@/store/settingsStore";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Progress } from "@/components/ui/progress";
-import { format, startOfWeek, subDays } from "date-fns";
+import { format, startOfWeek, endOfWeek, subWeeks, addDays, subDays } from "date-fns";
 import { calculateStreak, calculateCompletionRate, isHabitDueOnDate } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, Bar } from "recharts";
@@ -22,15 +22,55 @@ export default function Insights() {
   
   const [range, setRange] = useState<7 | 30>(7);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = last week, etc.
 
   const today = new Date();
-  // Generate dates using noon to avoid timezone issues
   const todayNoon = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 12, 0, 0);
+
+  // Week selector dates
+  const weekStartsOn = settings.weekStartsMonday ? 1 : 0;
+  const selectedWeekStart = startOfWeek(subWeeks(todayNoon, weekOffset), { weekStartsOn });
+  const selectedWeekEnd = endOfWeek(subWeeks(todayNoon, weekOffset), { weekStartsOn });
+
+  // Generate week days for the selected week
+  const weekDays = Array.from({ length: 7 }, (_, i) =>
+    format(addDays(selectedWeekStart, i), "yyyy-MM-dd")
+  );
+
+  // Generate days for overall stats (range-based)
   const days = Array.from({ length: range }, (_, i) => 
     format(subDays(todayNoon, range - 1 - i), "yyyy-MM-dd")
   );
   
-  // Weekly habit completions (count ONLY habits that are due on that date)
+  // Weekly habit completions for the selected week (for week chart)
+  const weekHabitCompletions = weekDays.map((date) => {
+    const activeHabits = habits.filter((h) => !h.archived);
+    const dateObj = new Date(date + "T12:00:00");
+    const dueHabits = activeHabits.filter((h) => isHabitDueOnDate(h, dateObj));
+    const completed = dueHabits.filter((h) =>
+      logs.some((l) => l.habitId === h.id && l.date === date && l.status === "done")
+    );
+
+    const total = dueHabits.length;
+    return {
+      date,
+      day: format(dateObj, "EEE"),
+      rate: total > 0 ? Math.round((completed.length / total) * 100) : 0,
+      completed: completed.length,
+      total,
+    };
+  });
+
+  // Weekly focus minutes for the selected week
+  const weekFocusMinutes = weekDays.map((date) => ({
+    date,
+    day: format(new Date(date + "T12:00:00"), "EEE"),
+    minutes: sessions
+      .filter((s) => s.date === date)
+      .reduce((acc, s) => acc + s.durationMinutes, 0),
+  }));
+
+  // Overall stats use the range-based days
   const habitCompletions = days.map((date) => {
     const activeHabits = habits.filter((h) => !h.archived);
     const dateObj = new Date(date + "T12:00:00");
@@ -49,7 +89,7 @@ export default function Insights() {
     };
   });
 
-  // Focus minutes per day
+  // Focus minutes per day (for overall stats)
   const focusMinutes = days.map((date) => ({
     date,
     day: format(new Date(date + "T12:00:00"), "EEE"),
@@ -293,6 +333,128 @@ export default function Insights() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Week Selector */}
+      <Card className="glass border-primary/20">
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-primary" />
+              Weekly Overview
+            </h3>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setWeekOffset(weekOffset + 1)}
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </Button>
+              <span className="text-sm font-medium min-w-[140px] text-center">
+                {format(selectedWeekStart, "MMM d")} - {format(selectedWeekEnd, "MMM d")}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setWeekOffset(Math.max(0, weekOffset - 1))}
+                disabled={weekOffset === 0}
+              >
+                <ChevronRight className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Week Stats Summary */}
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-secondary/50 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">Week Completion</p>
+              <p className="text-xl font-bold">
+                {weekHabitCompletions.filter(d => d.total > 0).length > 0
+                  ? Math.round(
+                      weekHabitCompletions
+                        .filter(d => d.total > 0)
+                        .reduce((acc, d) => acc + d.rate, 0) /
+                        weekHabitCompletions.filter(d => d.total > 0).length
+                    )
+                  : 0}%
+              </p>
+            </div>
+            <div className="bg-secondary/50 rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">Week Focus</p>
+              <p className="text-xl font-bold">
+                {Math.floor(weekFocusMinutes.reduce((acc, d) => acc + d.minutes, 0) / 60)}h{" "}
+                {weekFocusMinutes.reduce((acc, d) => acc + d.minutes, 0) % 60}m
+              </p>
+            </div>
+          </div>
+
+          {/* Week Habit Completion Chart */}
+          <div className="mb-4">
+            <p className="text-xs text-muted-foreground mb-2">Habit Completion</p>
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={weekHabitCompletions}>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                  <YAxis hide domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number, name: string, props: { payload?: { completed?: number; total?: number } }) => [
+                      `${value}% (${props.payload?.completed ?? 0}/${props.payload?.total ?? 0})`,
+                      "Completion",
+                    ]}
+                  />
+                  <Bar
+                    dataKey="rate"
+                    fill="hsl(var(--primary))"
+                    radius={[4, 4, 0, 0]}
+                    opacity={0.8}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Week Focus Minutes Chart */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">Focus Minutes</p>
+            <div className="h-32">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={weekFocusMinutes}>
+                  <defs>
+                    <linearGradient id="weekFocusGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
+                  <YAxis hide />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "8px",
+                    }}
+                    formatter={(value: number) => [`${value} min`, "Focus"]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="minutes"
+                    stroke="hsl(var(--success))"
+                    strokeWidth={2}
+                    fill="url(#weekFocusGradient)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Habit Completion Chart */}
       <Card className="glass">
