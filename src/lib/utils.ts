@@ -163,7 +163,7 @@ function calculateCurrentStreak(habit: Habit, logs: HabitLog[], fromDate: Date):
   return streak;
 }
 
-function isHabitDueOnDate(habit: Habit, date: Date): boolean {
+export function isHabitDueOnDate(habit: Habit, date: Date): boolean {
   const dayOfWeek = date.getDay();
   
   switch (habit.schedule.type) {
