@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { BarChart3, TrendingUp, Target, Timer, Trophy, AlertCircle, Lightbulb, ChevronDown, ChevronLeft, ChevronRight, Brain, Zap, Calendar } from "lucide-react";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
@@ -16,11 +16,16 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, BarChart, 
 
 export default function Insights() {
   const { habits, logs } = useHabitStore();
-  const { sessions } = useFocusStore();
+  const { sessions, fetchSessions } = useFocusStore();
   const { weeklyReviews, addWeeklyReview, settings } = useSettingsStore();
   const { entries: journalEntries } = useJournalStore();
   
   const [range, setRange] = useState<7 | 30>(7);
+
+  // Refresh focus sessions when the page mounts to ensure latest data
+  useEffect(() => {
+    fetchSessions();
+  }, [fetchSessions]);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, 1 = last week, etc.
 
