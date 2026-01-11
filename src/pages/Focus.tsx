@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo } from "react";
 import { motion } from "framer-motion";
-import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2, Settings, Volume2, VolumeX, Minus, Plus } from "lucide-react";
+import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2, Settings, Volume2, VolumeX, Minus, Plus, Bell } from "lucide-react";
 import { useFocusStore } from "@/store/focusStore";
 import { useHabitStore } from "@/store/habitStore";
 import { formatTime, getToday, isHabitDueToday } from "@/lib/utils";
 import { alarmSound, AlarmSoundType } from "@/lib/audio";
+import { requestNotificationPermission, scheduleNotification } from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -61,17 +62,24 @@ export default function Focus() {
           setShowCompleteDialog(true);
           // Play alarm sound with selected type
           alarmSound.playAlarm(preset.alarmSound);
-          // Show browser notification (if permitted)
-          if ("Notification" in window && Notification.permission === "granted") {
-            new Notification("Focus session complete!", {
-              body: timer.task || "Great work! Time for a break.",
-              icon: "/icon.svg"
-            });
-          }
+          // Send notification (works on iOS, Android, and web)
+          scheduleNotification(
+            Date.now(),
+            "Focus session complete! 🎉",
+            timer.task || "Great work! Time for a break.",
+            new Date()
+          );
         } else {
           // Play softer sound for break end
           alarmSound.playBreakEnd(preset.alarmSound);
           toast.success("Break complete! Ready for the next session?");
+          // Send notification for break end too
+          scheduleNotification(
+            Date.now(),
+            "Break is over! ☕",
+            "Ready for the next focus session?",
+            new Date()
+          );
           completeSession();
         }
       }
@@ -80,11 +88,18 @@ export default function Focus() {
     return () => clearInterval(interval);
   }, [timer.isRunning, timer.isPaused, timer.startTimestamp, timer.phase, preset.alarmSound]);
 
-  // Request notification permission
+  // Request notification permission on mount (handles both web and native)
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  
   useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
+    const checkPermission = async () => {
+      const granted = await requestNotificationPermission();
+      setNotificationsEnabled(granted);
+      if (granted) {
+        toast.success("Notifications enabled! You'll be notified when your focus session ends.", { duration: 3000 });
+      }
+    };
+    checkPermission();
   }, []);
 
   const progress = timer.isRunning 
