@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff, Cloud, CloudOff, Palette, Globe, User, Shield, Smartphone, ChevronRight } from "lucide-react";
+import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff, Cloud, Palette, Globe, Shield, Smartphone, ChevronRight, Vibrate, Clock, Timer, Eye, Zap } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useHabitStore } from "@/store/habitStore";
@@ -8,6 +8,7 @@ import { useJournalStore } from "@/store/journalStore";
 import { useCalendarStore } from "@/store/calendarStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+import { requestNotificationPermission } from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
@@ -22,7 +23,7 @@ export default function Settings() {
   const { signOut, user } = useAuth();
   const { settings, setTheme, updateSettings, resetSettings, clearAllData: clearSettings, weeklyReviews } = useSettingsStore();
   const { habits, logs, clearAllData: clearHabits } = useHabitStore();
-  const { sessions, clearAllData: clearFocus } = useFocusStore();
+  const { sessions, preset, updatePreset, clearAllData: clearFocus } = useFocusStore();
   const { entries: journalEntries, clearAllData: clearJournal } = useJournalStore();
   const { events, clearAllData: clearCalendar } = useCalendarStore();
   
@@ -34,6 +35,27 @@ export default function Settings() {
     localStorage.getItem("weather-city") || ""
   );
   const [profile, setProfile] = useState<{ display_name: string | null; avatar_url: string | null } | null>(null);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(() => 
+    localStorage.getItem("notifications-enabled") === "true"
+  );
+  const [hapticsEnabled, setHapticsEnabled] = useState(() => 
+    localStorage.getItem("haptics-enabled") !== "false"
+  );
+  const [use24Hour, setUse24Hour] = useState(() => 
+    localStorage.getItem("use-24-hour") === "true"
+  );
+  const [compactView, setCompactView] = useState(() => 
+    localStorage.getItem("compact-view") === "true"
+  );
+  const [showStreaks, setShowStreaks] = useState(() => 
+    localStorage.getItem("show-streaks") !== "false"
+  );
+  const [autoStartBreaks, setAutoStartBreaks] = useState(() => 
+    preset.autoStartBreaks ?? false
+  );
+  const [autoStartWork, setAutoStartWork] = useState(() => 
+    preset.autoStartWork ?? false
+  );
 
   useEffect(() => {
     if (user) {
@@ -233,6 +255,58 @@ export default function Settings() {
     toast.success("Weather location saved");
   };
 
+  const handleNotificationToggle = async (enabled: boolean) => {
+    if (enabled) {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        setNotificationsEnabled(true);
+        localStorage.setItem("notifications-enabled", "true");
+        toast.success("Notifications enabled");
+      } else {
+        toast.error("Notification permission denied. Please enable in your device settings.");
+      }
+    } else {
+      setNotificationsEnabled(false);
+      localStorage.setItem("notifications-enabled", "false");
+      toast.info("Notifications disabled");
+    }
+  };
+
+  const handleHapticsToggle = (enabled: boolean) => {
+    setHapticsEnabled(enabled);
+    localStorage.setItem("haptics-enabled", enabled.toString());
+    if (enabled) {
+      // Trigger a sample vibration
+      if (navigator.vibrate) navigator.vibrate(50);
+    }
+    toast.success(enabled ? "Haptic feedback enabled" : "Haptic feedback disabled");
+  };
+
+  const handleTimeFormatToggle = (use24: boolean) => {
+    setUse24Hour(use24);
+    localStorage.setItem("use-24-hour", use24.toString());
+  };
+
+  const handleCompactViewToggle = (compact: boolean) => {
+    setCompactView(compact);
+    localStorage.setItem("compact-view", compact.toString());
+  };
+
+  const handleShowStreaksToggle = (show: boolean) => {
+    setShowStreaks(show);
+    localStorage.setItem("show-streaks", show.toString());
+  };
+
+  const handleAutoStartBreaksToggle = (enabled: boolean) => {
+    setAutoStartBreaks(enabled);
+    updatePreset({ autoStartBreaks: enabled });
+  };
+
+  const handleAutoStartWorkToggle = (enabled: boolean) => {
+    setAutoStartWork(enabled);
+    updatePreset({ autoStartWork: enabled });
+  };
+
   const isDark = settings.theme === "dark";
   const focusModeEnabled = settings.focusModeEnabled ?? false;
 
@@ -336,6 +410,137 @@ export default function Settings() {
                 <SelectItem value="monday">Monday</SelectItem>
               </SelectContent>
             </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Notifications & Haptics */}
+      <Card className="glass">
+        <CardContent className="p-6 space-y-6">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Bell className="w-4 h-4 text-primary" />
+            Notifications & Feedback
+          </h3>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Bell className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">Push Notifications</p>
+                <p className="text-sm text-muted-foreground">Get notified when focus sessions end</p>
+              </div>
+            </div>
+            <Switch checked={notificationsEnabled} onCheckedChange={handleNotificationToggle} />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Vibrate className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">Haptic Feedback</p>
+                <p className="text-sm text-muted-foreground">Vibration on button taps</p>
+              </div>
+            </div>
+            <Switch checked={hapticsEnabled} onCheckedChange={handleHapticsToggle} />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Focus Timer Settings */}
+      <Card className="glass">
+        <CardContent className="p-6 space-y-6">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Timer className="w-4 h-4 text-primary" />
+            Focus Timer
+          </h3>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">Auto-start Breaks</p>
+                <p className="text-sm text-muted-foreground">Start breaks automatically after work</p>
+              </div>
+            </div>
+            <Switch checked={autoStartBreaks} onCheckedChange={handleAutoStartBreaksToggle} />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">Auto-start Work</p>
+                <p className="text-sm text-muted-foreground">Start work automatically after breaks</p>
+              </div>
+            </div>
+            <Switch checked={autoStartWork} onCheckedChange={handleAutoStartWorkToggle} />
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-medium">Default Work Duration</p>
+              <p className="text-sm text-muted-foreground">Pomodoro work session length</p>
+            </div>
+            <Select 
+              value={preset.workMinutes.toString()}
+              onValueChange={(v) => updatePreset({ workMinutes: parseInt(v) })}
+            >
+              <SelectTrigger className="w-24">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="15">15 min</SelectItem>
+                <SelectItem value="20">20 min</SelectItem>
+                <SelectItem value="25">25 min</SelectItem>
+                <SelectItem value="30">30 min</SelectItem>
+                <SelectItem value="45">45 min</SelectItem>
+                <SelectItem value="50">50 min</SelectItem>
+                <SelectItem value="60">60 min</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Display Preferences */}
+      <Card className="glass">
+        <CardContent className="p-6 space-y-6">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Eye className="w-4 h-4 text-primary" />
+            Display Preferences
+          </h3>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">24-Hour Time</p>
+                <p className="text-sm text-muted-foreground">Use 24-hour format (14:00 vs 2:00 PM)</p>
+              </div>
+            </div>
+            <Switch checked={use24Hour} onCheckedChange={handleTimeFormatToggle} />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Eye className="w-5 h-5 text-primary" />
+              <div>
+                <p className="font-medium">Compact View</p>
+                <p className="text-sm text-muted-foreground">Show more items with less spacing</p>
+              </div>
+            </div>
+            <Switch checked={compactView} onCheckedChange={handleCompactViewToggle} />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Zap className="w-5 h-5 text-warning" />
+              <div>
+                <p className="font-medium">Show Streaks</p>
+                <p className="text-sm text-muted-foreground">Display streak counters on habits</p>
+              </div>
+            </div>
+            <Switch checked={showStreaks} onCheckedChange={handleShowStreaksToggle} />
           </div>
         </CardContent>
       </Card>
