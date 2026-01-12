@@ -519,6 +519,12 @@ function FocusSettingsDialog({
                   Gentle
                 </div>
               </SelectItem>
+              <SelectItem value="melody">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4" />
+                  Melody
+                </div>
+              </SelectItem>
               <SelectItem value="none">
                 <div className="flex items-center gap-2">
                   <VolumeX className="w-4 h-4" />

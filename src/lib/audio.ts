@@ -1,5 +1,5 @@
 // Audio utility for playing alarm sounds
-export type AlarmSoundType = "chime" | "bell" | "gentle" | "none";
+export type AlarmSoundType = "chime" | "bell" | "gentle" | "melody" | "none";
 
 export class AlarmSound {
   private audioContext: AudioContext | null = null;
@@ -23,6 +23,9 @@ export class AlarmSound {
         break;
       case "gentle":
         this.playGentle();
+        break;
+      case "melody":
+        this.playMelody();
         break;
     }
   }
@@ -149,6 +152,70 @@ export class AlarmSound {
     oscillator.stop(now + 2);
   }
 
+  private playMelody(): void {
+    const ctx = this.getAudioContext();
+    const now = ctx.currentTime;
+
+    // Apple-style uplifting melody - similar to "Radial" or "Constellation"
+    // Notes: C5, E5, G5, C6, B5, G5, E5, G5 with rhythmic timing
+    const notes = [
+      { freq: 523.25, time: 0, duration: 0.2 },      // C5
+      { freq: 659.25, time: 0.2, duration: 0.2 },    // E5
+      { freq: 783.99, time: 0.4, duration: 0.2 },    // G5
+      { freq: 1046.50, time: 0.6, duration: 0.4 },   // C6 (longer)
+      { freq: 987.77, time: 1.1, duration: 0.2 },    // B5
+      { freq: 783.99, time: 1.3, duration: 0.2 },    // G5
+      { freq: 659.25, time: 1.5, duration: 0.2 },    // E5
+      { freq: 783.99, time: 1.7, duration: 0.5 },    // G5 (resolve)
+    ];
+
+    notes.forEach(({ freq, time, duration }) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      // Use triangle wave for a softer, more musical tone
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(freq, now + time);
+      
+      // Smooth envelope
+      gainNode.gain.setValueAtTime(0, now + time);
+      gainNode.gain.linearRampToValueAtTime(0.25, now + time + 0.03);
+      gainNode.gain.setValueAtTime(0.25, now + time + duration * 0.7);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + time + duration);
+      
+      oscillator.start(now + time);
+      oscillator.stop(now + time + duration + 0.1);
+    });
+
+    // Add a subtle harmonic layer for richness
+    notes.forEach(({ freq, time, duration }) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      
+      // Octave higher, quieter
+      oscillator.type = 'sine';
+      oscillator.frequency.setValueAtTime(freq * 2, now + time);
+      
+      gainNode.gain.setValueAtTime(0, now + time);
+      gainNode.gain.linearRampToValueAtTime(0.08, now + time + 0.03);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + time + duration);
+      
+      oscillator.start(now + time);
+      oscillator.stop(now + time + duration + 0.1);
+    });
+
+    // Repeat the melody after a pause
+    setTimeout(() => {
+      this.playMelody();
+    }, 3000);
+  }
+
   playBreakEnd(type: AlarmSoundType = "chime"): void {
     if (type === "none") return;
     
@@ -195,6 +262,27 @@ export class AlarmSound {
       case "gentle":
         freq = 392;
         break;
+      case "melody":
+        // Play a short melody preview
+        const previewNotes = [
+          { freq: 523.25, time: 0 },
+          { freq: 659.25, time: 0.15 },
+          { freq: 783.99, time: 0.3 },
+        ];
+        previewNotes.forEach(({ freq, time }) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + time);
+          gain.gain.setValueAtTime(0, now + time);
+          gain.gain.linearRampToValueAtTime(0.2, now + time + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + time + 0.2);
+          osc.start(now + time);
+          osc.stop(now + time + 0.25);
+        });
+        return;
     }
     
     const oscillator = ctx.createOscillator();
