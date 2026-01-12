@@ -103,16 +103,9 @@ export default function Insights() {
       .reduce((acc, s) => acc + s.durationMinutes, 0),
   }));
 
-  // Calculate weekly focus using the current week (offset 0)
-  const currentWeekStart = startOfWeek(todayNoon, { weekStartsOn });
-  const currentWeekDays = Array.from({ length: 7 }, (_, i) =>
-    format(addDays(currentWeekStart, i), "yyyy-MM-dd")
-  );
-  const weeklyFocusTotal = sessions
-    .filter((s) => currentWeekDays.includes(s.date))
-    .reduce((acc, s) => acc + s.durationMinutes, 0);
-  
-  const totalFocus = weeklyFocusTotal;
+  // Selected week focus total (follows the week selector)
+  const selectedWeekFocusTotal = weekFocusMinutes.reduce((acc, d) => acc + d.minutes, 0);
+  const totalFocus = selectedWeekFocusTotal;
 
   // Average completion should ignore days where no habits were due (so weekends don't tank the score)
   const completionDays = habitCompletions.filter((d) => d.total > 0);
@@ -329,7 +322,9 @@ export default function Insights() {
           <CardContent className="p-4">
             <Timer className="w-5 h-5 text-primary mb-2" />
             <p className="text-2xl font-bold">{Math.floor(totalFocus / 60)}h {totalFocus % 60}m</p>
-            <p className="text-xs text-muted-foreground">This week</p>
+            <p className="text-xs text-muted-foreground">
+              {format(selectedWeekStart, "MMM d")}–{format(selectedWeekEnd, "MMM d")}
+            </p>
           </CardContent>
         </Card>
         <Card className="glass">
