@@ -27,7 +27,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ActivityCharts } from "@/components/activity/ActivityCharts";
-import { NavigationCard } from "@/components/activity/NavigationCard";
+import { InAppNavigation } from "@/components/activity/InAppNavigation";
 import { AchievementsBadges } from "@/components/activity/AchievementsBadges";
 import { SocialLeaderboard } from "@/components/activity/SocialLeaderboard";
 import { WorkoutPlans } from "@/components/activity/WorkoutPlans";
@@ -527,29 +527,8 @@ export default function Activity() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="navigate" className="space-y-4 mt-4">
-            {/* Map for Navigation */}
-            <Card className="glass overflow-hidden border-none">
-              <div className="h-[220px] relative">
-                {mapUrl ? (
-                  <iframe
-                    src={mapUrl}
-                    className="w-full h-full border-0"
-                    title="Navigation Map"
-                    loading="lazy"
-                  />
-                ) : (
-                  <div className="h-full flex items-center justify-center bg-gradient-to-br from-secondary to-secondary/50">
-                    <div className="text-center">
-                      <MapPin className="w-8 h-8 mx-auto text-muted-foreground mb-2 animate-pulse" />
-                      <p className="text-sm text-muted-foreground">Getting your location...</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            <NavigationCard currentPosition={currentPosition} />
+          <TabsContent value="navigate" className="mt-4">
+            <InAppNavigation currentPosition={currentPosition} />
           </TabsContent>
 
           <TabsContent value="stats" className="space-y-4 mt-4">
