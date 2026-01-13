@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Card, CardContent } from "@/components/ui/card";
@@ -48,8 +47,8 @@ interface RouteStep {
 }
 
 interface RouteData {
-  distance: number; // in meters
-  duration: number; // in seconds
+  distance: number;
+  duration: number;
   coordinates: [number, number][];
   steps: RouteStep[];
 }
@@ -62,7 +61,6 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-// Custom markers
 const createCustomIcon = (color: string) => {
   return L.divIcon({
     className: "custom-marker",
@@ -78,34 +76,6 @@ const createCustomIcon = (color: string) => {
     iconAnchor: [12, 12],
   });
 };
-
-const originIcon = createCustomIcon("#22c55e");
-const destinationIcon = createCustomIcon("#ef4444");
-
-// Map controller component
-function MapController({ center, zoom }: { center: [number, number] | null; zoom?: number }) {
-  const map = useMap();
-  
-  useEffect(() => {
-    if (center) {
-      map.flyTo(center, zoom || map.getZoom(), { duration: 0.5 });
-    }
-  }, [center, zoom, map]);
-  
-  return null;
-}
-
-// Location button component
-function LocateButton({ onLocate }: { onLocate: () => void }) {
-  return (
-    <button
-      onClick={onLocate}
-      className="absolute bottom-4 right-4 z-[1000] w-12 h-12 bg-background rounded-full shadow-lg flex items-center justify-center hover:bg-secondary transition-colors"
-    >
-      <LocateFixed className="w-5 h-5 text-primary" />
-    </button>
-  );
-}
 
 function getManeuverIcon(maneuver: string) {
   const iconClass = "w-5 h-5";
@@ -162,8 +132,12 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showDirections, setShowDirections] = useState(false);
-  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null);
   
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<L.Map | null>(null);
+  const originMarkerRef = useRef<L.Marker | null>(null);
+  const destinationMarkerRef = useRef<L.Marker | null>(null);
+  const routeLineRef = useRef<L.Polyline | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const travelModes = [
@@ -172,7 +146,101 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     { mode: "car" as const, label: "Drive", icon: "🚗" },
   ];
 
-  // Search for addresses using Nominatim
+  // Initialize map
+  useEffect(() => {
+    if (!mapContainerRef.current || mapRef.current) return;
+
+    const defaultCenter: [number, number] = currentPosition 
+      ? [currentPosition.lat, currentPosition.lng] 
+      : [40.7128, -74.006];
+
+    const map = L.map(mapContainerRef.current, {
+      center: defaultCenter,
+      zoom: 15,
+      zoomControl: false,
+    });
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    }).addTo(map);
+
+    // Add zoom control to bottom left
+    L.control.zoom({ position: "bottomleft" }).addTo(map);
+
+    mapRef.current = map;
+
+    return () => {
+      map.remove();
+      mapRef.current = null;
+    };
+  }, []);
+
+  // Update origin marker when position changes
+  useEffect(() => {
+    if (!mapRef.current || !currentPosition) return;
+
+    if (originMarkerRef.current) {
+      originMarkerRef.current.setLatLng([currentPosition.lat, currentPosition.lng]);
+    } else {
+      originMarkerRef.current = L.marker(
+        [currentPosition.lat, currentPosition.lng],
+        { icon: createCustomIcon("#22c55e") }
+      ).addTo(mapRef.current);
+    }
+
+    // Center map on user if no destination selected
+    if (!selectedDestination) {
+      mapRef.current.setView([currentPosition.lat, currentPosition.lng], 15);
+    }
+  }, [currentPosition, selectedDestination]);
+
+  // Update destination marker
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (destinationMarkerRef.current) {
+      mapRef.current.removeLayer(destinationMarkerRef.current);
+      destinationMarkerRef.current = null;
+    }
+
+    if (selectedDestination) {
+      destinationMarkerRef.current = L.marker(
+        [selectedDestination.lat, selectedDestination.lng],
+        { icon: createCustomIcon("#ef4444") }
+      ).addTo(mapRef.current);
+
+      // Fit bounds to show both markers
+      if (currentPosition) {
+        const bounds = L.latLngBounds(
+          [currentPosition.lat, currentPosition.lng],
+          [selectedDestination.lat, selectedDestination.lng]
+        );
+        mapRef.current.fitBounds(bounds, { padding: [50, 50] });
+      } else {
+        mapRef.current.setView([selectedDestination.lat, selectedDestination.lng], 14);
+      }
+    }
+  }, [selectedDestination, currentPosition]);
+
+  // Update route line
+  useEffect(() => {
+    if (!mapRef.current) return;
+
+    if (routeLineRef.current) {
+      mapRef.current.removeLayer(routeLineRef.current);
+      routeLineRef.current = null;
+    }
+
+    if (route) {
+      routeLineRef.current = L.polyline(route.coordinates, {
+        color: "#3b82f6",
+        weight: 5,
+        opacity: 0.8,
+      }).addTo(mapRef.current);
+    }
+  }, [route]);
+
+  // Search for addresses
   const searchAddress = useCallback(async (query: string) => {
     if (query.length < 3) {
       setSearchResults([]);
@@ -183,11 +251,7 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     try {
       const response = await fetch(
         `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
-        {
-          headers: {
-            "Accept-Language": "en",
-          },
-        }
+        { headers: { "Accept-Language": "en" } }
       );
       const data = await response.json();
       setSearchResults(data);
@@ -232,7 +296,9 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
 
       if (data.code === "Ok" && data.routes.length > 0) {
         const routeData = data.routes[0];
-        const coordinates = routeData.geometry.coordinates.map((coord: [number, number]) => [coord[1], coord[0]] as [number, number]);
+        const coordinates = routeData.geometry.coordinates.map(
+          (coord: [number, number]) => [coord[1], coord[0]] as [number, number]
+        );
         
         const steps: RouteStep[] = routeData.legs[0].steps.map((step: any) => ({
           instruction: step.maneuver.instruction || `Continue on ${step.name || "road"}`,
@@ -274,7 +340,6 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     });
     setDestination(result.display_name.split(",")[0]);
     setSearchResults([]);
-    setMapCenter([parseFloat(result.lat), parseFloat(result.lon)]);
   };
 
   const handleClearDestination = () => {
@@ -296,63 +361,25 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
   };
 
   const handleCenterOnUser = () => {
-    if (currentPosition) {
-      setMapCenter([currentPosition.lat, currentPosition.lng]);
+    if (currentPosition && mapRef.current) {
+      mapRef.current.setView([currentPosition.lat, currentPosition.lng], 15);
     } else {
       toast.error("Location not available");
     }
   };
 
-  const defaultCenter: [number, number] = currentPosition 
-    ? [currentPosition.lat, currentPosition.lng] 
-    : [40.7128, -74.006]; // NYC fallback
-
   return (
     <div className="relative h-[calc(100vh-280px)] min-h-[400px] rounded-2xl overflow-hidden">
-      {/* Map */}
-      <MapContainer
-        center={mapCenter || defaultCenter}
-        zoom={15}
-        className="h-full w-full z-0"
-        zoomControl={false}
+      {/* Map container */}
+      <div ref={mapContainerRef} className="h-full w-full z-0" />
+
+      {/* Locate button */}
+      <button
+        onClick={handleCenterOnUser}
+        className="absolute bottom-4 right-4 z-[1000] w-12 h-12 bg-background rounded-full shadow-lg flex items-center justify-center hover:bg-secondary transition-colors"
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        
-        <MapController center={mapCenter} zoom={selectedDestination ? 14 : 15} />
-
-        {/* Origin marker */}
-        {currentPosition && (
-          <Marker 
-            position={[currentPosition.lat, currentPosition.lng]} 
-            icon={originIcon}
-          />
-        )}
-
-        {/* Destination marker */}
-        {selectedDestination && (
-          <Marker 
-            position={[selectedDestination.lat, selectedDestination.lng]} 
-            icon={destinationIcon}
-          />
-        )}
-
-        {/* Route polyline */}
-        {route && (
-          <Polyline
-            positions={route.coordinates}
-            pathOptions={{
-              color: "#3b82f6",
-              weight: 5,
-              opacity: 0.8,
-            }}
-          />
-        )}
-
-        <LocateButton onLocate={handleCenterOnUser} />
-      </MapContainer>
+        <LocateFixed className="w-5 h-5 text-primary" />
+      </button>
 
       {/* Search overlay */}
       <div className="absolute top-4 left-4 right-4 z-[1000]">
