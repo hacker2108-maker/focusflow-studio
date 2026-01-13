@@ -21,7 +21,9 @@ import {
   MoveUp,
   Milestone,
   Clock,
-  Route as RouteIcon
+  Route as RouteIcon,
+  Volume2,
+  VolumeX
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -44,6 +46,7 @@ interface RouteStep {
   duration: number;
   maneuver: string;
   name: string;
+  location: [number, number]; // [lng, lat]
 }
 
 interface RouteData {
@@ -76,6 +79,121 @@ const createCustomIcon = (color: string) => {
     iconAnchor: [12, 12],
   });
 };
+
+// Calculate distance between two points in meters (Haversine formula)
+function calculateDistanceMeters(
+  lat1: number, lon1: number,
+  lat2: number, lon2: number
+): number {
+  const R = 6371000; // Earth's radius in meters
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+// Voice navigation helper
+class VoiceNavigation {
+  private synthesis: SpeechSynthesis | null = null;
+  private enabled: boolean = true;
+  private lastSpokenInstruction: string = "";
+
+  constructor() {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      this.synthesis = window.speechSynthesis;
+    }
+  }
+
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (!enabled && this.synthesis) {
+      this.synthesis.cancel();
+    }
+  }
+
+  isEnabled() {
+    return this.enabled;
+  }
+
+  speak(text: string, force: boolean = false) {
+    if (!this.synthesis || !this.enabled) return;
+    
+    // Don't repeat the same instruction unless forced
+    if (text === this.lastSpokenInstruction && !force) return;
+    this.lastSpokenInstruction = text;
+
+    // Cancel any ongoing speech
+    this.synthesis.cancel();
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+    utterance.lang = "en-US";
+
+    // Try to use a natural voice
+    const voices = this.synthesis.getVoices();
+    const preferredVoice = voices.find(v => 
+      v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Enhanced"))
+    ) || voices.find(v => v.lang.startsWith("en"));
+    
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    this.synthesis.speak(utterance);
+  }
+
+  speakDistance(meters: number) {
+    if (meters < 50) {
+      return "now";
+    } else if (meters < 100) {
+      return "in 50 meters";
+    } else if (meters < 200) {
+      return "in 100 meters";
+    } else if (meters < 500) {
+      return `in ${Math.round(meters / 100) * 100} meters`;
+    } else if (meters < 1000) {
+      return `in ${Math.round(meters / 100) * 100} meters`;
+    } else {
+      return `in ${(meters / 1000).toFixed(1)} kilometers`;
+    }
+  }
+
+  announceStep(step: RouteStep, distanceToStep: number) {
+    const distanceText = this.speakDistance(distanceToStep);
+    let announcement = "";
+
+    if (distanceToStep < 30) {
+      // Immediate instruction
+      announcement = step.instruction;
+    } else if (distanceToStep < 100) {
+      // Approaching
+      announcement = `${step.instruction}, ${distanceText}`;
+    } else {
+      // Advance warning
+      announcement = `${distanceText}, ${step.instruction}`;
+    }
+
+    this.speak(announcement);
+  }
+
+  announceArrival() {
+    this.speak("You have arrived at your destination.", true);
+  }
+
+  announceStart(totalDistance: number, duration: number) {
+    const distanceText = totalDistance < 1000 
+      ? `${Math.round(totalDistance)} meters`
+      : `${(totalDistance / 1000).toFixed(1)} kilometers`;
+    const durationMins = Math.round(duration / 60);
+    this.speak(`Starting navigation. Your destination is ${distanceText} away, about ${durationMins} minutes.`, true);
+  }
+}
 
 function getManeuverIcon(maneuver: string) {
   const iconClass = "w-5 h-5";
@@ -132,6 +250,9 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
   const [isNavigating, setIsNavigating] = useState(false);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [showDirections, setShowDirections] = useState(false);
+  const [livePosition, setLivePosition] = useState<{ lat: number; lng: number } | null>(null);
+  const [distanceToNextStep, setDistanceToNextStep] = useState<number | null>(null);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -139,12 +260,25 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
   const destinationMarkerRef = useRef<L.Marker | null>(null);
   const routeLineRef = useRef<L.Polyline | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gpsWatchRef = useRef<number | null>(null);
+  const voiceNavRef = useRef<VoiceNavigation>(new VoiceNavigation());
+  const lastAnnouncedDistanceRef = useRef<number>(Infinity);
 
   const travelModes = [
     { mode: "foot" as const, label: "Walk", icon: "🚶" },
     { mode: "bike" as const, label: "Bike", icon: "🚴" },
     { mode: "car" as const, label: "Drive", icon: "🚗" },
   ];
+
+  // Toggle voice
+  const toggleVoice = useCallback(() => {
+    setVoiceEnabled(prev => {
+      const newValue = !prev;
+      voiceNavRef.current.setEnabled(newValue);
+      toast.success(newValue ? "Voice navigation enabled" : "Voice navigation muted");
+      return newValue;
+    });
+  }, []);
 
   // Initialize map
   useEffect(() => {
@@ -164,7 +298,6 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
 
-    // Add zoom control to bottom left
     L.control.zoom({ position: "bottomleft" }).addTo(map);
 
     mapRef.current = map;
@@ -175,9 +308,109 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     };
   }, []);
 
-  // Update origin marker when position changes
+  // Real-time GPS tracking during navigation
   useEffect(() => {
-    if (!mapRef.current || !currentPosition) return;
+    if (!isNavigating || !route) {
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+        gpsWatchRef.current = null;
+      }
+      return;
+    }
+
+    if ("geolocation" in navigator) {
+      gpsWatchRef.current = navigator.geolocation.watchPosition(
+        (position) => {
+          const newPos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          setLivePosition(newPos);
+
+          // Update marker position
+          if (mapRef.current && originMarkerRef.current) {
+            originMarkerRef.current.setLatLng([newPos.lat, newPos.lng]);
+            // Keep map centered on user during navigation
+            mapRef.current.setView([newPos.lat, newPos.lng], mapRef.current.getZoom());
+          }
+        },
+        (error) => {
+          console.error("GPS error:", error);
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000,
+        }
+      );
+    }
+
+    return () => {
+      if (gpsWatchRef.current !== null) {
+        navigator.geolocation.clearWatch(gpsWatchRef.current);
+        gpsWatchRef.current = null;
+      }
+    };
+  }, [isNavigating, route]);
+
+  // Auto-advance steps based on GPS position
+  useEffect(() => {
+    if (!isNavigating || !route || !livePosition) return;
+
+    const currentStep = route.steps[currentStepIndex];
+    if (!currentStep) return;
+
+    // Calculate distance to current step's location
+    const distanceToStep = calculateDistanceMeters(
+      livePosition.lat,
+      livePosition.lng,
+      currentStep.location[1], // lat
+      currentStep.location[0]  // lng
+    );
+
+    setDistanceToNextStep(distanceToStep);
+
+    // Voice announcements at key distances
+    const announcementThresholds = [500, 200, 100, 50, 30];
+    for (const threshold of announcementThresholds) {
+      if (lastAnnouncedDistanceRef.current > threshold && distanceToStep <= threshold) {
+        voiceNavRef.current.announceStep(currentStep, distanceToStep);
+        break;
+      }
+    }
+    lastAnnouncedDistanceRef.current = distanceToStep;
+
+    // Auto-advance to next step when within 25 meters
+    if (distanceToStep < 25) {
+      if (currentStepIndex < route.steps.length - 1) {
+        setCurrentStepIndex(prev => prev + 1);
+        lastAnnouncedDistanceRef.current = Infinity; // Reset for new step
+        
+        // Announce the next instruction
+        const nextStep = route.steps[currentStepIndex + 1];
+        if (nextStep) {
+          setTimeout(() => {
+            const nextDistance = calculateDistanceMeters(
+              livePosition.lat,
+              livePosition.lng,
+              nextStep.location[1],
+              nextStep.location[0]
+            );
+            voiceNavRef.current.announceStep(nextStep, nextDistance);
+          }, 500);
+        }
+      } else {
+        // Arrived at destination
+        voiceNavRef.current.announceArrival();
+        toast.success("You have arrived at your destination!");
+        setIsNavigating(false);
+      }
+    }
+  }, [livePosition, isNavigating, route, currentStepIndex]);
+
+  // Update origin marker when position changes (non-navigating)
+  useEffect(() => {
+    if (!mapRef.current || !currentPosition || isNavigating) return;
 
     if (originMarkerRef.current) {
       originMarkerRef.current.setLatLng([currentPosition.lat, currentPosition.lng]);
@@ -188,11 +421,10 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
       ).addTo(mapRef.current);
     }
 
-    // Center map on user if no destination selected
     if (!selectedDestination) {
       mapRef.current.setView([currentPosition.lat, currentPosition.lng], 15);
     }
-  }, [currentPosition, selectedDestination]);
+  }, [currentPosition, selectedDestination, isNavigating]);
 
   // Update destination marker
   useEffect(() => {
@@ -209,7 +441,6 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
         { icon: createCustomIcon("#ef4444") }
       ).addTo(mapRef.current);
 
-      // Fit bounds to show both markers
       if (currentPosition) {
         const bounds = L.latLngBounds(
           [currentPosition.lat, currentPosition.lng],
@@ -306,6 +537,7 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
           duration: step.duration,
           maneuver: step.maneuver.type + (step.maneuver.modifier ? `-${step.maneuver.modifier}` : ""),
           name: step.name || "Unknown road",
+          location: step.maneuver.location as [number, number],
         }));
 
         setRoute({
@@ -350,6 +582,9 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     setIsNavigating(false);
     setCurrentStepIndex(0);
     setShowDirections(false);
+    setLivePosition(null);
+    setDistanceToNextStep(null);
+    lastAnnouncedDistanceRef.current = Infinity;
   };
 
   const handleStartNavigation = () => {
@@ -357,12 +592,40 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     setIsNavigating(true);
     setCurrentStepIndex(0);
     setShowDirections(true);
+    setLivePosition(currentPosition);
+    lastAnnouncedDistanceRef.current = Infinity;
+    
+    // Announce start
+    voiceNavRef.current.announceStart(route.distance, route.duration);
+    
+    // After a delay, announce first step
+    setTimeout(() => {
+      if (route.steps[0] && currentPosition) {
+        const firstStepDist = calculateDistanceMeters(
+          currentPosition.lat,
+          currentPosition.lng,
+          route.steps[0].location[1],
+          route.steps[0].location[0]
+        );
+        voiceNavRef.current.announceStep(route.steps[0], firstStepDist);
+      }
+    }, 3000);
+    
     toast.success("Navigation started!");
   };
 
+  const handleStopNavigation = () => {
+    setIsNavigating(false);
+    setLivePosition(null);
+    setDistanceToNextStep(null);
+    lastAnnouncedDistanceRef.current = Infinity;
+    toast.success("Navigation ended");
+  };
+
   const handleCenterOnUser = () => {
-    if (currentPosition && mapRef.current) {
-      mapRef.current.setView([currentPosition.lat, currentPosition.lng], 15);
+    const pos = livePosition || currentPosition;
+    if (pos && mapRef.current) {
+      mapRef.current.setView([pos.lat, pos.lng], 16);
     } else {
       toast.error("Location not available");
     }
@@ -372,6 +635,20 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     <div className="relative h-[calc(100vh-280px)] min-h-[400px] rounded-2xl overflow-hidden">
       {/* Map container */}
       <div ref={mapContainerRef} className="h-full w-full z-0" />
+
+      {/* Voice toggle button */}
+      {isNavigating && (
+        <button
+          onClick={toggleVoice}
+          className="absolute bottom-20 right-4 z-[1000] w-12 h-12 bg-background rounded-full shadow-lg flex items-center justify-center hover:bg-secondary transition-colors"
+        >
+          {voiceEnabled ? (
+            <Volume2 className="w-5 h-5 text-primary" />
+          ) : (
+            <VolumeX className="w-5 h-5 text-muted-foreground" />
+          )}
+        </button>
+      )}
 
       {/* Locate button */}
       <button
@@ -513,6 +790,8 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                               "flex items-start gap-3 p-3 rounded-xl transition-colors",
                               isNavigating && index === currentStepIndex
                                 ? "bg-primary/20"
+                                : index < currentStepIndex
+                                ? "bg-muted/30 opacity-60"
                                 : "bg-secondary/30"
                             )}
                           >
@@ -527,7 +806,10 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                             <div className="flex-1 min-w-0">
                               <p className="font-medium text-sm">{step.instruction}</p>
                               <p className="text-xs text-muted-foreground">
-                                {formatDistance(step.distance)} · {formatDuration(step.duration)}
+                                {isNavigating && index === currentStepIndex && distanceToNextStep !== null
+                                  ? `${formatDistance(distanceToNextStep)} away`
+                                  : `${formatDistance(step.distance)} · ${formatDuration(step.duration)}`
+                                }
                               </p>
                             </div>
                           </div>
@@ -541,10 +823,10 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                 <div className="flex gap-3">
                   <Button
                     variant="outline"
-                    onClick={handleClearDestination}
+                    onClick={isNavigating ? handleStopNavigation : handleClearDestination}
                     className="flex-1 h-12"
                   >
-                    Cancel
+                    {isNavigating ? "End" : "Cancel"}
                   </Button>
                   {!isNavigating ? (
                     <Button
@@ -562,13 +844,21 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                   ) : (
                     <Button
                       onClick={() => {
-                        setIsNavigating(false);
-                        toast.success("Navigation ended");
+                        // Re-announce current step
+                        if (route && route.steps[currentStepIndex] && livePosition) {
+                          const dist = calculateDistanceMeters(
+                            livePosition.lat,
+                            livePosition.lng,
+                            route.steps[currentStepIndex].location[1],
+                            route.steps[currentStepIndex].location[0]
+                          );
+                          voiceNavRef.current.announceStep(route.steps[currentStepIndex], dist);
+                        }
                       }}
-                      variant="destructive"
                       className="flex-1 h-12"
                     >
-                      End Navigation
+                      <Volume2 className="w-5 h-5 mr-2" />
+                      Repeat
                     </Button>
                   )}
                 </div>
@@ -596,31 +886,34 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                   <div className="flex-1">
                     <p className="font-bold text-lg">{route.steps[currentStepIndex].instruction}</p>
                     <p className="text-primary-foreground/80 text-sm">
-                      {formatDistance(route.steps[currentStepIndex].distance)}
+                      {distanceToNextStep !== null 
+                        ? `${formatDistance(distanceToNextStep)} away`
+                        : formatDistance(route.steps[currentStepIndex].distance)
+                      }
                     </p>
                   </div>
                 </div>
                 
-                {/* Navigation controls */}
-                <div className="flex gap-2 mt-4">
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentStepIndex === 0}
-                    onClick={() => setCurrentStepIndex(prev => Math.max(0, prev - 1))}
-                    className="flex-1"
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    disabled={currentStepIndex === route.steps.length - 1}
-                    onClick={() => setCurrentStepIndex(prev => Math.min(route.steps.length - 1, prev + 1))}
-                    className="flex-1"
-                  >
-                    Next
-                  </Button>
+                {/* Step indicator */}
+                <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary-foreground/20">
+                  <span className="text-sm text-primary-foreground/70">
+                    Step {currentStepIndex + 1} of {route.steps.length}
+                  </span>
+                  <div className="flex gap-1">
+                    {route.steps.map((_, idx) => (
+                      <div
+                        key={idx}
+                        className={cn(
+                          "w-2 h-2 rounded-full",
+                          idx === currentStepIndex
+                            ? "bg-primary-foreground"
+                            : idx < currentStepIndex
+                            ? "bg-primary-foreground/50"
+                            : "bg-primary-foreground/20"
+                        )}
+                      />
+                    ))}
+                  </div>
                 </div>
               </CardContent>
             </Card>
