@@ -321,9 +321,24 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
 
     L.control.zoom({ position: "bottomleft" }).addTo(map);
 
+    // Fix white gap on right when zooming out - recalc map size
+    const onMapResize = () => map.invalidateSize();
+    map.on("zoomend", onMapResize);
+    map.on("moveend", onMapResize);
+
+    // Initial size fix after container is laid out
+    requestAnimationFrame(() => map.invalidateSize());
+
+    // ResizeObserver: fix white gap when container resizes (sidebar, orientation)
+    const ro = mapContainerRef.current && new ResizeObserver(onMapResize);
+    if (ro) ro.observe(mapContainerRef.current);
+
     mapRef.current = map;
 
     return () => {
+      ro?.disconnect();
+      map.off("zoomend", onMapResize);
+      map.off("moveend", onMapResize);
       map.remove();
       mapRef.current = null;
     };
@@ -659,8 +674,8 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
         ? "h-full min-h-[400px] rounded-none" 
         : "h-[calc(100vh-280px)] min-h-[400px] rounded-2xl shadow-lg border border-border"
     )}>
-      {/* Map container */}
-      <div ref={mapContainerRef} className="h-full w-full z-0 bg-white" />
+      {/* Map container - absolute inset ensures full fill, prevents white gap when zooming */}
+      <div ref={mapContainerRef} className="absolute inset-0 h-full w-full min-w-full z-0 bg-[#e5e3df]" />
 
       {/* Google Maps-style controls - fix gray attribution on right, style zoom */}
       <style>{`
@@ -670,7 +685,7 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
         .leaflet-control-zoom a:hover { background: #f8f9fa !important; }
         .custom-marker-gmaps { background: transparent !important; border: none !important; }
         .leaflet-control-attribution { background: transparent !important; color: #999 !important; font-size: 10px !important; padding: 2px 5px !important; box-shadow: none !important; }
-        .leaflet-container, .leaflet-tile-pane { background: #fff !important; }
+        .leaflet-container, .leaflet-tile-pane { background: #e5e3df !important; }
       `}</style>
 
       {/* Voice toggle button - Google Maps style */}
