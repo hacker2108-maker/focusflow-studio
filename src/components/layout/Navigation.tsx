@@ -1,7 +1,13 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Timer, BarChart3, Settings, BookOpen, CalendarDays, MapPin, StickyNote } from "lucide-react";
+import { Home, Target, Timer, BarChart3, Settings, BookOpen, CalendarDays, MapPin, StickyNote, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const navItems = [
   { to: "/", icon: Home, label: "Home" },
@@ -56,6 +62,7 @@ export function BottomNav() {
 
 const sidebarNavItems = [
   ...navItems,
+  { to: "/navigate", icon: Navigation, label: "Navigate" },
   { to: "/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
   { to: "/insights", icon: BarChart3, label: "Insights" },
@@ -80,10 +87,10 @@ export function Sidebar() {
               key={item.to}
               to={item.to}
               className={cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
+                "flex items-center gap-3 px-4 py-3 rounded-xl transition-all hover:bg-secondary/80",
                 isActive
                   ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
               )}
             >
               <item.icon className="w-5 h-5" />

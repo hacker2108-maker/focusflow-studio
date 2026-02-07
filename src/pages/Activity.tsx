@@ -12,7 +12,6 @@ import {
   Car,
   PersonStanding,
   Bike,
-  Navigation,
   Trophy,
   Zap,
   Target,
@@ -27,7 +26,6 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { ActivityCharts } from "@/components/activity/ActivityCharts";
-import { InAppNavigation } from "@/components/activity/InAppNavigation";
 import { AchievementsBadges } from "@/components/activity/AchievementsBadges";
 import { SocialLeaderboard } from "@/components/activity/SocialLeaderboard";
 import { WorkoutPlans } from "@/components/activity/WorkoutPlans";
@@ -69,7 +67,7 @@ export default function Activity() {
   const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number } | null>(null);
   const [activeTab, setActiveTab] = useState("track");
 
-  const tabOrder = ["track", "workouts", "navigate", "stats", "social", "achievements"] as const;
+  const tabOrder = ["track", "workouts", "stats", "social", "achievements"] as const;
   const tabSwipeRef = useRef<{ x: number; y: number } | null>(null);
 
   const handleTabSwipeStart = (e: TouchEvent<HTMLDivElement>) => {
@@ -193,12 +191,11 @@ export default function Activity() {
 
   return (
     <div className="space-y-6 animate-fade-in pb-24">
-      {/* Header with gradient */}
+      {/* Header */}
       <header className="relative">
-        <div className="absolute inset-0 bg-gradient-to-r from-primary/20 via-primary/10 to-transparent rounded-3xl blur-3xl -z-10" />
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-display-sm bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Activity</h1>
+            <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Activity</h1>
             <p className="text-muted-foreground mt-1">Track your fitness journey</p>
           </div>
           {/* Quick Stats Badge */}
@@ -239,10 +236,6 @@ export default function Activity() {
             <TabsTrigger value="workouts" className="text-xs px-4 whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <Zap className="w-3 h-3 mr-1.5" />
               Workouts
-            </TabsTrigger>
-            <TabsTrigger value="navigate" className="text-xs px-4 whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm">
-              <Navigation className="w-3 h-3 mr-1.5" />
-              Navigate
             </TabsTrigger>
             <TabsTrigger value="stats" className="text-xs px-4 whitespace-nowrap data-[state=active]:bg-background data-[state=active]:shadow-sm">
               <TrendingUp className="w-3 h-3 mr-1.5" />
@@ -525,10 +518,6 @@ export default function Activity() {
                 )}
               </CardContent>
             </Card>
-          </TabsContent>
-
-          <TabsContent value="navigate" className="mt-4">
-            <InAppNavigation currentPosition={currentPosition} />
           </TabsContent>
 
           <TabsContent value="stats" className="space-y-4 mt-4">

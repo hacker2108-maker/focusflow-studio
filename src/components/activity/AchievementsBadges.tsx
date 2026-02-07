@@ -148,7 +148,7 @@ export function AchievementsBadges({ activities }: AchievementsBadgesProps) {
   const unlockedCount = achievementStatus.filter((a) => a.unlocked).length;
 
   return (
-    <Card className="glass">
+    <Card className="glass hover:shadow-md transition-shadow">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-lg flex items-center gap-2">

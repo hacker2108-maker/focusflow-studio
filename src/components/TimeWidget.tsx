@@ -44,7 +44,7 @@ export function TimeWidget({ compact = false }: TimeWidgetProps) {
   }
 
   return (
-    <div className="flex items-center gap-3 p-4 glass rounded-xl">
+    <div className="flex items-center gap-3 p-4 glass rounded-xl hover:shadow-md transition-shadow">
       <div className="w-12 h-12 rounded-full gradient-primary flex items-center justify-center">
         <Clock className="w-6 h-6 text-primary-foreground" />
       </div>

@@ -353,7 +353,7 @@ export function WorkoutPlans() {
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
               >
-                <Card className="glass hover:border-primary/30 transition-all cursor-pointer border-none">
+                <Card className="glass hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5 transition-all cursor-pointer border-none">
                   <CardContent className="p-4">
                     <div className="flex items-start gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center flex-shrink-0">

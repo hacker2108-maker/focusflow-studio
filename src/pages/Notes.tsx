@@ -18,6 +18,11 @@ import {
   Copy,
   FolderOpen,
   X,
+  Briefcase,
+  User,
+  Lightbulb,
+  Archive,
+  FileStack,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,20 +53,20 @@ import { exportNoteToPdf, shareNote, copyNoteToClipboard } from "@/lib/exportPdf
 
 const noteColors = [
   { name: "Default", value: "#FFFFFF" },
-  { name: "Yellow", value: "#FEF3C7" },
-  { name: "Green", value: "#D1FAE5" },
-  { name: "Blue", value: "#DBEAFE" },
-  { name: "Purple", value: "#EDE9FE" },
-  { name: "Pink", value: "#FCE7F3" },
-  { name: "Orange", value: "#FED7AA" },
+  { name: "Light Gray", value: "#F5F5F5" },
+  { name: "Gray", value: "#E5E5E5" },
+  { name: "Warm White", value: "#FAFAFA" },
+  { name: "Cool Gray", value: "#F4F4F5" },
+  { name: "Soft White", value: "#FAFAF9" },
+  { name: "Off White", value: "#F8F8F8" },
 ];
 
-const folderIcons: Record<string, string> = {
-  Notes: "📝",
-  Work: "💼",
-  Personal: "👤",
-  Ideas: "💡",
-  Archive: "📦",
+const folderIcons: Record<string, React.ElementType> = {
+  Notes: FileText,
+  Work: Briefcase,
+  Personal: User,
+  Ideas: Lightbulb,
+  Archive: Archive,
 };
 
 export default function Notes() {
@@ -96,13 +101,19 @@ export default function Notes() {
     fetchNotes();
   }, [fetchNotes]);
 
+  // Only sync from store when switching notes (by id), NOT when store updates from our own save.
+  // This prevents the typing bug where words get deleted as the debounced save overwrites edit state.
   useEffect(() => {
     if (selectedNote) {
       setEditTitle(selectedNote.title);
       setEditContent(selectedNote.content);
       setIsEditing(true);
+    } else {
+      setEditTitle("");
+      setEditContent("");
+      setIsEditing(false);
     }
-  }, [selectedNote]);
+  }, [selectedNote?.id]);
 
   // Auto-save with debounce
   useEffect(() => {
@@ -279,7 +290,7 @@ export default function Notes() {
                             className={cn(
                               "w-8 h-8 rounded-full border-2 transition-all",
                               selectedNote.color === color.value
-                                ? "border-primary scale-110"
+                                ? "border-foreground scale-110"
                                 : "border-border/50 hover:scale-105"
                             )}
                             style={{ backgroundColor: color.value }}
@@ -344,7 +355,7 @@ export default function Notes() {
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 placeholder="Title"
-                className="text-xl font-semibold border-none bg-transparent p-0 h-auto focus-visible:ring-0 placeholder:text-muted-foreground/50"
+                className="text-xl font-semibold border-none bg-transparent p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none shadow-none placeholder:text-muted-foreground/50"
               />
 
               <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -364,7 +375,7 @@ export default function Notes() {
                 value={editContent}
                 onChange={(e) => setEditContent(e.target.value)}
                 placeholder="Start typing..."
-                className="min-h-[60vh] border-none bg-transparent p-0 resize-none focus-visible:ring-0 text-base leading-relaxed placeholder:text-muted-foreground/50"
+                className="min-h-[60vh] border-none bg-transparent p-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none shadow-none text-base leading-relaxed placeholder:text-muted-foreground/50"
               />
             </div>
           </motion.div>
@@ -377,13 +388,13 @@ export default function Notes() {
             exit={{ opacity: 0 }}
             className="space-y-6 animate-fade-in"
           >
-            {/* Header */}
+            {/* Header - Apple Notes style */}
             <header className="flex items-center justify-between">
               <div>
-                <h1 className="text-display-sm bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                <h1 className="text-2xl md:text-3xl font-semibold text-foreground">
                   Notes
                 </h1>
-                <p className="text-muted-foreground mt-1">
+                <p className="text-muted-foreground mt-0.5 text-sm">
                   {filteredNotes.length} {filteredNotes.length === 1 ? "note" : "notes"}
                   {selectedFolder && ` in ${selectedFolder}`}
                 </p>
@@ -400,7 +411,7 @@ export default function Notes() {
                 <Button
                   onClick={handleCreateNote}
                   size="icon"
-                  className="rounded-full shadow-lg"
+                  className="rounded-full bg-foreground text-background hover:bg-foreground/90"
                 >
                   <Plus className="w-5 h-5" />
                 </Button>
@@ -470,7 +481,10 @@ export default function Notes() {
                     onClick={() => setSelectedFolder(folder)}
                     className="gap-1"
                   >
-                    <span>{folderIcons[folder] || "📁"}</span>
+                    {(function() {
+                      const Icon = folderIcons[folder] || Folder;
+                      return <Icon className="w-4 h-4" />;
+                    })()}
                     {folder}
                     <span className="text-xs opacity-60">({folderCounts[folder] || 0})</span>
                   </Button>
@@ -614,7 +628,7 @@ function FolderList({
 }) {
   return (
     <div className="space-y-1">
-      <button
+        <button
         onClick={() => onSelectFolder(null)}
         className={cn(
           "w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors",
@@ -622,7 +636,7 @@ function FolderList({
         )}
       >
         <span className="flex items-center gap-2">
-          <span>📋</span>
+          <FileStack className="w-4 h-4" />
           All Notes
         </span>
         <span className="text-xs text-muted-foreground">
@@ -642,7 +656,10 @@ function FolderList({
             onClick={() => onSelectFolder(folder)}
             className="flex-1 flex items-center gap-2 text-left"
           >
-            <span>{folderIcons[folder] || "📁"}</span>
+            {(function() {
+              const Icon = folderIcons[folder] || Folder;
+              return <Icon className="w-4 h-4" />;
+            })()}
             {folder}
           </button>
           <div className="flex items-center gap-1">
@@ -694,15 +711,14 @@ function NoteCard({
 }) {
   return (
     <motion.div
-      initial={{ opacity: 0, y: 10 }}
+      initial={{ opacity: 0, y: 4 }}
       animate={{ opacity: 1, y: 0 }}
-      whileHover={{ scale: 1.01 }}
       whileTap={{ scale: 0.99 }}
     >
       <Card
         className={cn(
-          "glass border-none cursor-pointer overflow-hidden",
-          "hover:shadow-lg transition-all"
+          "border border-border cursor-pointer overflow-hidden rounded-xl",
+          "hover:bg-muted/50 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
         )}
         style={{
           backgroundColor: note.color === "#FFFFFF" ? undefined : note.color,
@@ -767,7 +783,10 @@ function NoteCard({
                         }}
                         className={cn(note.folder === folder && "bg-accent")}
                       >
-                        <span className="mr-2">{folderIcons[folder] || "📁"}</span>
+                        {(function() {
+                          const Icon = folderIcons[folder] || Folder;
+                          return <Icon className="w-4 h-4 mr-2" />;
+                        })()}
                         {folder}
                       </DropdownMenuItem>
                     ))}

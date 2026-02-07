@@ -101,12 +101,12 @@ export function generateShareableContent(note: Note): string {
     day: 'numeric'
   });
 
-  return `📝 ${note.title || 'Untitled'}
+  return `${note.title || 'Untitled'}
 
 ${note.content}
 
 ---
-📁 ${note.folder} | 📅 ${formattedDate}`;
+${note.folder} | ${formattedDate}`;
 }
 
 export async function shareNote(note: Note): Promise<void> {

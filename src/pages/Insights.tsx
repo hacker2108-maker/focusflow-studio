@@ -256,23 +256,23 @@ export default function Insights() {
     <div className="space-y-6 animate-fade-in pb-24">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-display-sm">Insights</h1>
-          <p className="text-muted-foreground mt-1">AI-powered progress analysis</p>
+          <h1 className="text-2xl font-semibold text-foreground">Insights</h1>
+          <p className="text-muted-foreground mt-0.5 text-sm">Your progress at a glance</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex rounded-lg border border-border overflow-hidden">
           <Button 
-            variant={range === 7 ? "default" : "outline"} 
+            variant={range === 7 ? "default" : "ghost"} 
             size="sm"
             onClick={() => setRange(7)}
-            className={range === 7 ? "gradient-primary text-primary-foreground" : ""}
+            className={range === 7 ? "bg-foreground text-background" : "rounded-none"}
           >
             7 days
           </Button>
           <Button 
-            variant={range === 30 ? "default" : "outline"} 
+            variant={range === 30 ? "default" : "ghost"} 
             size="sm"
             onClick={() => setRange(30)}
-            className={range === 30 ? "gradient-primary text-primary-foreground" : ""}
+            className={range === 30 ? "bg-foreground text-background" : "rounded-none"}
           >
             30 days
           </Button>
@@ -280,11 +280,11 @@ export default function Insights() {
       </header>
 
       {/* Progress Score */}
-      <Card className="glass border-primary/20 overflow-hidden">
+      <Card className="border border-border overflow-hidden">
         <CardContent className="p-6">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-full gradient-primary flex items-center justify-center shadow-glow">
-              <Brain className="w-8 h-8 text-primary-foreground" />
+            <div className="w-16 h-16 rounded-full bg-foreground flex items-center justify-center">
+              <Brain className="w-8 h-8 text-background" />
             </div>
             <div className="flex-1">
               <div className="flex items-baseline gap-2">
@@ -311,9 +311,9 @@ export default function Insights() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <Card className="glass">
+        <Card className="border border-border">
           <CardContent className="p-4">
-            <TrendingUp className="w-5 h-5 text-primary mb-2" />
+            <TrendingUp className="w-5 h-5 text-foreground mb-2" />
             <p className="text-2xl font-bold">{avgCompletion}%</p>
             <p className="text-xs text-muted-foreground">Avg completion</p>
           </CardContent>
@@ -327,9 +327,9 @@ export default function Insights() {
             </p>
           </CardContent>
         </Card>
-        <Card className="glass">
+        <Card className="border border-border">
           <CardContent className="p-4">
-            <Zap className="w-5 h-5 text-warning mb-2" />
+            <Zap className="w-5 h-5 text-foreground mb-2" />
             <p className="text-2xl font-bold">{totalSessions}</p>
             <p className="text-xs text-muted-foreground">Focus sessions</p>
           </CardContent>
@@ -344,11 +344,11 @@ export default function Insights() {
       </div>
 
       {/* Week Selector */}
-      <Card className="glass border-primary/20">
+      <Card className="border border-border">
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-primary" />
+              <Calendar className="w-4 h-4 text-foreground" />
               Weekly Overview
             </h3>
             <div className="flex items-center gap-2">
@@ -437,8 +437,8 @@ export default function Insights() {
                 <AreaChart data={weekFocusMinutes}>
                   <defs>
                     <linearGradient id="weekFocusGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--success))" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="hsl(var(--success))" stopOpacity={0} />
+                      <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.25} />
+                      <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11 }} />
@@ -466,10 +466,10 @@ export default function Insights() {
       </Card>
 
       {/* Habit Completion Chart */}
-      <Card className="glass">
+      <Card className="border border-border">
         <CardContent className="p-6">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <BarChart3 className="w-4 h-4 text-primary" />
+            <BarChart3 className="w-4 h-4 text-foreground" />
             Habit Completion
           </h3>
           <div className="h-40">
@@ -477,8 +477,8 @@ export default function Insights() {
               <AreaChart data={habitCompletions.slice(-7)}>
                 <defs>
                   <linearGradient id="completionGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="hsl(var(--foreground))" stopOpacity={0.25}/>
+                    <stop offset="95%" stopColor="hsl(var(--foreground))" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
@@ -505,10 +505,10 @@ export default function Insights() {
       </Card>
 
       {/* Focus Minutes Chart */}
-      <Card className="glass">
+      <Card className="border border-border">
         <CardContent className="p-6">
           <h3 className="font-semibold mb-4 flex items-center gap-2">
-            <Timer className="w-4 h-4 text-primary" />
+            <Timer className="w-4 h-4 text-foreground" />
             Focus Minutes
           </h3>
           <div className="h-40">
@@ -538,18 +538,18 @@ export default function Insights() {
 
       {/* Insights Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <Card className="glass">
+        <Card className="border border-border">
           <CardContent className="p-4">
-            <Trophy className="w-4 h-4 text-success mb-2" />
+            <Trophy className="w-4 h-4 text-foreground mb-2" />
             <p className="text-sm font-medium">Best Day</p>
             <p className="text-xs text-muted-foreground">{dayLabels[bestDay.day]} ({Math.round(bestDay.avgRate)}%)</p>
           </CardContent>
         </Card>
         
         {mostConsistent && (
-          <Card className="glass">
+          <Card className="border border-border">
             <CardContent className="p-4">
-              <Target className="w-4 h-4 text-primary mb-2" />
+              <Target className="w-4 h-4 text-foreground mb-2" />
               <p className="text-sm font-medium truncate">{mostConsistent.habit.name}</p>
               <p className="text-xs text-muted-foreground">{mostConsistent.completionRate}% • {mostConsistent.streak.current} day streak</p>
             </CardContent>
@@ -557,9 +557,9 @@ export default function Insights() {
         )}
 
         {mostMissed && mostMissed.completionRate < 50 && (
-          <Card className="glass col-span-2">
+          <Card className="border border-border col-span-2">
             <CardContent className="p-4 flex items-start gap-3">
-              <AlertCircle className="w-4 h-4 text-warning mt-0.5" />
+              <AlertCircle className="w-4 h-4 text-foreground mt-0.5" />
               <div>
                 <p className="text-sm font-medium">{mostMissed.habit.name} needs attention</p>
                 <p className="text-xs text-muted-foreground">{Math.round(mostMissed.completionRate)}% completion rate</p>
@@ -591,7 +591,7 @@ export default function Insights() {
 
       {/* Weekly Review */}
       <Collapsible open={reviewOpen} onOpenChange={setReviewOpen}>
-        <Card className="glass">
+        <Card className="border border-border">
           <CollapsibleTrigger asChild>
             <CardContent className="p-4 cursor-pointer hover:bg-secondary/50 transition-colors">
               <div className="flex items-center justify-between">
@@ -635,7 +635,7 @@ export default function Insights() {
                   className="mt-1.5 min-h-[60px]"
                 />
               </div>
-              <Button onClick={saveReview} className="w-full gradient-primary text-primary-foreground">
+              <Button onClick={saveReview} className="w-full bg-foreground text-background hover:bg-foreground/90">
                 Save Review
               </Button>
             </CardContent>

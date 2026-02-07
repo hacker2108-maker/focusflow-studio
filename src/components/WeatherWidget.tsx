@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Cloud, MapPin, RefreshCw, Thermometer } from "lucide-react";
+import { Cloud, MapPin, RefreshCw, Thermometer, Droplets, Wind } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -110,7 +110,7 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
           <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
         ) : weather ? (
           <>
-            <span className="text-lg">{weather.current.icon}</span>
+            <Cloud className="w-4 h-4 text-muted-foreground" />
             <span className="font-medium">{weather.current.temperature}°C</span>
             <span className="text-muted-foreground">{weather.current.description}</span>
           </>
@@ -122,7 +122,7 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
   }
 
   return (
-    <Card className="glass overflow-hidden">
+    <Card className="glass overflow-hidden hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         {editingCity ? (
           <div className="space-y-3">
@@ -164,9 +164,9 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
                   <p className="text-sm text-muted-foreground">{weather.current.description}</p>
                 </div>
               </div>
-              <div className="text-right text-sm text-muted-foreground">
-                <p>💧 {weather.current.humidity}%</p>
-                <p>💨 {weather.current.windSpeed} km/h</p>
+              <div className="flex flex-col gap-1 text-right text-sm text-muted-foreground">
+                <p className="flex items-center justify-end gap-1.5"><Droplets className="w-4 h-4" />{weather.current.humidity}%</p>
+                <p className="flex items-center justify-end gap-1.5"><Wind className="w-4 h-4" />{weather.current.windSpeed} km/h</p>
               </div>
             </div>
             
@@ -187,11 +187,13 @@ export function WeatherWidget({ compact = false }: WeatherWidgetProps) {
             {/* 5-day forecast */}
             <div className="grid grid-cols-5 gap-1 pt-2 border-t border-border/50">
               {weather.forecast.map((day, i) => (
-                <div key={day.date} className="text-center">
+                <div key={day.date} className="text-center p-2 rounded-lg hover:bg-secondary/50 transition-colors">
                   <p className="text-xs text-muted-foreground">
                     {i === 0 ? "Today" : new Date(day.date).toLocaleDateString("en", { weekday: "short" })}
                   </p>
-                  <p className="text-lg my-1">{day.icon}</p>
+                  <div className="my-2 flex justify-center">
+                    <Cloud className="w-6 h-6 text-muted-foreground" />
+                  </div>
                   <p className="text-xs font-medium">{day.high}°</p>
                   <p className="text-xs text-muted-foreground">{day.low}°</p>
                 </div>

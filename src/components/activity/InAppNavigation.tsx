@@ -1,8 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { 
   Navigation, 
@@ -23,7 +21,10 @@ import {
   Clock,
   Route as RouteIcon,
   Volume2,
-  VolumeX
+  VolumeX,
+  PersonStanding,
+  Bike,
+  Car
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 interface InAppNavigationProps {
   currentPosition: { lat: number; lng: number } | null;
+  fullScreen?: boolean;
 }
 
 interface SearchResult {
@@ -64,19 +66,35 @@ L.Icon.Default.mergeOptions({
   shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
 });
 
-const createCustomIcon = (color: string) => {
+// Google Maps-style markers: blue dot for user, red pin for destination
+const createCustomIcon = (color: string, isDestination: boolean) => {
+  if (isDestination) {
+    return L.divIcon({
+      className: "custom-marker-gmaps",
+      html: `<div style="
+        width: 36px;
+        height: 36px;
+        background: #EA4335;
+        border: 3px solid white;
+        border-radius: 50%;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      "></div>`,
+      iconSize: [36, 36],
+      iconAnchor: [18, 18],
+    });
+  }
   return L.divIcon({
-    className: "custom-marker",
+    className: "custom-marker-gmaps",
     html: `<div style="
-      width: 24px;
-      height: 24px;
-      background: ${color};
+      width: 18px;
+      height: 18px;
+      background: #4285F4;
       border: 3px solid white;
       border-radius: 50%;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
     "></div>`,
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [18, 18],
+    iconAnchor: [9, 9],
   });
 };
 
@@ -239,7 +257,7 @@ function formatDuration(seconds: number): string {
   return `${hours} hr ${remainingMins} min`;
 }
 
-export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
+export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNavigationProps) {
   const [destination, setDestination] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -265,9 +283,9 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
   const lastAnnouncedDistanceRef = useRef<number>(Infinity);
 
   const travelModes = [
-    { mode: "foot" as const, label: "Walk", icon: "🚶" },
-    { mode: "bike" as const, label: "Bike", icon: "🚴" },
-    { mode: "car" as const, label: "Drive", icon: "🚗" },
+    { mode: "foot" as const, label: "Walk", icon: PersonStanding },
+    { mode: "bike" as const, label: "Bike", icon: Bike },
+    { mode: "car" as const, label: "Drive", icon: Car },
   ];
 
   // Toggle voice
@@ -294,8 +312,11 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
       zoomControl: false,
     });
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    // Google Maps-style tiles (CartoDB Voyager - clean streets, similar to Google Maps)
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png", {
+      subdomains: "abcd",
+      maxZoom: 20,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
     }).addTo(map);
 
     L.control.zoom({ position: "bottomleft" }).addTo(map);
@@ -438,7 +459,7 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
     if (selectedDestination) {
       destinationMarkerRef.current = L.marker(
         [selectedDestination.lat, selectedDestination.lng],
-        { icon: createCustomIcon("#ef4444") }
+        { icon: createCustomIcon("#EA4335", true) }
       ).addTo(mapRef.current);
 
       if (currentPosition) {
@@ -464,9 +485,9 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
 
     if (route) {
       routeLineRef.current = L.polyline(route.coordinates, {
-        color: "#3b82f6",
+        color: "#4285F4",
         weight: 5,
-        opacity: 0.8,
+        opacity: 0.9,
       }).addTo(mapRef.current);
     }
   }, [route]);
@@ -632,39 +653,55 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
   };
 
   return (
-    <div className="relative h-[calc(100vh-280px)] min-h-[400px] rounded-2xl overflow-hidden">
+    <div className={cn(
+      "relative overflow-hidden w-full font-['Roboto',sans-serif]",
+      fullScreen 
+        ? "h-full min-h-[400px] rounded-none" 
+        : "h-[calc(100vh-280px)] min-h-[400px] rounded-2xl shadow-lg border border-border"
+    )}>
       {/* Map container */}
-      <div ref={mapContainerRef} className="h-full w-full z-0" />
+      <div ref={mapContainerRef} className="h-full w-full z-0 bg-white" />
 
-      {/* Voice toggle button */}
+      {/* Google Maps-style controls - fix gray attribution on right, style zoom */}
+      <style>{`
+        .leaflet-bottom.leaflet-left { left: 16px !important; bottom: 100px !important; }
+        .leaflet-control-zoom { border: none !important; box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important; }
+        .leaflet-control-zoom a { background: white !important; color: #5f6368 !important; width: 40px !important; height: 40px !important; line-height: 40px !important; font-size: 18px !important; }
+        .leaflet-control-zoom a:hover { background: #f8f9fa !important; }
+        .custom-marker-gmaps { background: transparent !important; border: none !important; }
+        .leaflet-control-attribution { background: transparent !important; color: #999 !important; font-size: 10px !important; padding: 2px 5px !important; box-shadow: none !important; }
+        .leaflet-container, .leaflet-tile-pane { background: #fff !important; }
+      `}</style>
+
+      {/* Voice toggle button - Google Maps style */}
       {isNavigating && (
         <button
           onClick={toggleVoice}
-          className="absolute bottom-20 right-4 z-[1000] w-12 h-12 bg-background rounded-full shadow-lg flex items-center justify-center hover:bg-secondary transition-colors"
+          className="absolute bottom-20 right-4 z-[1000] w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
         >
           {voiceEnabled ? (
-            <Volume2 className="w-5 h-5 text-primary" />
+            <Volume2 className="w-5 h-5 text-[#5f6368]" />
           ) : (
-            <VolumeX className="w-5 h-5 text-muted-foreground" />
+            <VolumeX className="w-5 h-5 text-[#5f6368]" />
           )}
         </button>
       )}
 
-      {/* Locate button */}
+      {/* Locate button - Google Maps style (white circle with crosshair) */}
       <button
         onClick={handleCenterOnUser}
-        className="absolute bottom-4 right-4 z-[1000] w-12 h-12 bg-background rounded-full shadow-lg flex items-center justify-center hover:bg-secondary transition-colors"
+        className="absolute bottom-4 right-4 z-[1000] w-11 h-11 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors border border-gray-200"
       >
-        <LocateFixed className="w-5 h-5 text-primary" />
+        <LocateFixed className="w-5 h-5 text-[#5f6368]" />
       </button>
 
-      {/* Search overlay */}
+      {/* Search bar - Google Maps pill style */}
       <div className="absolute top-4 left-4 right-4 z-[1000]">
-        <div className="relative">
-          <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+        <div className="relative max-w-2xl mx-auto">
+          <div className="relative bg-white rounded-full shadow-lg border border-gray-200">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 w-5 h-5 text-[#5f6368]" />
             <Input
-              placeholder="Search destination..."
+              placeholder="Search for a place or address"
               value={destination}
               onChange={(e) => {
                 setDestination(e.target.value);
@@ -673,41 +710,41 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                   setRoute(null);
                 }
               }}
-              className="pl-12 pr-12 h-14 bg-background/95 backdrop-blur-sm shadow-lg rounded-2xl text-base"
+              className="pl-12 pr-12 h-12 bg-transparent border-0 rounded-full text-base placeholder:text-[#5f6368] focus-visible:ring-0 focus-visible:ring-offset-0"
             />
             {(destination || isSearching) && (
               <button
                 onClick={handleClearDestination}
-                className="absolute right-4 top-1/2 -translate-y-1/2"
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-1 rounded-full hover:bg-gray-100"
               >
                 {isSearching ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                  <Loader2 className="w-5 h-5 animate-spin text-[#5f6368]" />
                 ) : (
-                  <X className="w-5 h-5 text-muted-foreground" />
+                  <X className="w-5 h-5 text-[#5f6368]" />
                 )}
               </button>
             )}
           </div>
 
-          {/* Search results dropdown */}
+          {/* Search results dropdown - Google Maps style */}
           <AnimatePresence>
             {searchResults.length > 0 && !selectedDestination && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
+                initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute top-full left-0 right-0 mt-2 bg-background/95 backdrop-blur-sm rounded-2xl shadow-lg overflow-hidden"
+                exit={{ opacity: 0, y: -4 }}
+                className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200"
               >
                 {searchResults.map((result) => (
                   <button
                     key={result.place_id}
                     onClick={() => handleSelectResult(result)}
-                    className="w-full px-4 py-3 text-left hover:bg-secondary/50 transition-colors flex items-start gap-3 border-b border-border/50 last:border-0"
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors flex items-start gap-3 border-b border-gray-100 last:border-0 text-left"
                   >
-                    <MapPin className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                    <MapPin className="w-5 h-5 text-[#5f6368] mt-0.5 flex-shrink-0" />
                     <div className="min-w-0">
-                      <p className="font-medium truncate">{result.display_name.split(",")[0]}</p>
-                      <p className="text-sm text-muted-foreground truncate">
+                      <p className="font-medium text-gray-900 truncate">{result.display_name.split(",")[0]}</p>
+                      <p className="text-sm text-[#5f6368] truncate">
                         {result.display_name.split(",").slice(1, 3).join(",")}
                       </p>
                     </div>
@@ -719,54 +756,59 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
         </div>
       </div>
 
-      {/* Route info & controls panel */}
+      {/* Bottom sheet - Google Maps style */}
       <AnimatePresence>
         {selectedDestination && (
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
+            transition={{ type: "spring", damping: 30, stiffness: 300 }}
             className="absolute bottom-0 left-0 right-0 z-[1000]"
           >
-            <Card className="rounded-t-3xl rounded-b-none border-0 shadow-2xl bg-background/95 backdrop-blur-sm">
-              <CardContent className="p-4 space-y-4">
-                {/* Route summary */}
+            <div className="bg-white rounded-t-2xl shadow-[0_-4px_20px_rgba(0,0,0,0.15)] border-t border-gray-200 pb-[env(safe-area-inset-bottom)]">
+              {/* Drag handle - Google Maps style */}
+              <div className="flex justify-center pt-2 pb-1">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="p-4 space-y-4">
+                {/* Route summary - Google Maps style */}
                 {route && !isNavigating && (
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-2 text-primary">
-                        <Clock className="w-4 h-4" />
-                        <span className="font-semibold">{formatDuration(route.duration)}</span>
+                    <div className="flex items-center gap-6">
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-5 h-5 text-[#5f6368]" />
+                        <span className="font-medium text-gray-900">{formatDuration(route.duration)}</span>
                       </div>
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <RouteIcon className="w-4 h-4" />
-                        <span>{formatDistance(route.distance)}</span>
+                      <div className="flex items-center gap-2">
+                        <RouteIcon className="w-5 h-5 text-[#5f6368]" />
+                        <span className="text-[#5f6368]">{formatDistance(route.distance)}</span>
                       </div>
                     </div>
                     <button
                       onClick={() => setShowDirections(!showDirections)}
-                      className="text-muted-foreground"
+                      className="p-2 rounded-full hover:bg-gray-100 text-[#5f6368]"
                     >
                       {showDirections ? <ChevronDown className="w-5 h-5" /> : <ChevronUp className="w-5 h-5" />}
                     </button>
                   </div>
                 )}
 
-                {/* Travel mode selector */}
+                {/* Travel mode selector - Google Maps horizontal pills */}
                 {!isNavigating && (
                   <div className="flex gap-2">
-                    {travelModes.map(({ mode, label, icon }) => (
+                    {travelModes.map(({ mode, label, icon: Icon }) => (
                       <button
                         key={mode}
                         onClick={() => setSelectedMode(mode)}
                         className={cn(
-                          "flex-1 p-3 rounded-xl border text-center transition-all active:scale-95",
+                          "flex-1 p-3 rounded-lg border text-center transition-all active:scale-[0.98] hover:bg-gray-50",
                           selectedMode === mode
-                            ? "border-primary bg-primary/10"
-                            : "border-border/50 hover:border-border"
+                            ? "border-[#4285F4] bg-[#E8F0FE] text-[#1967D2]"
+                            : "border-gray-200 text-gray-700"
                         )}
                       >
-                        <span className="text-xl">{icon}</span>
+                        <Icon className="w-5 h-5 mx-auto" />
                         <p className="text-xs mt-1 font-medium">{label}</p>
                       </button>
                     ))}
@@ -782,30 +824,30 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                       exit={{ height: 0, opacity: 0 }}
                       className="overflow-hidden"
                     >
-                      <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                      <div className="max-h-48 overflow-y-auto space-y-1 pr-2">
                         {route.steps.map((step, index) => (
                           <div
                             key={index}
                             className={cn(
-                              "flex items-start gap-3 p-3 rounded-xl transition-colors",
+                              "flex items-start gap-3 p-3 rounded-lg transition-colors",
                               isNavigating && index === currentStepIndex
-                                ? "bg-primary/20"
+                                ? "bg-[#E8F0FE]"
                                 : index < currentStepIndex
-                                ? "bg-muted/30 opacity-60"
-                                : "bg-secondary/30"
+                                ? "bg-gray-50 opacity-70"
+                                : "bg-gray-50"
                             )}
                           >
                             <div className={cn(
-                              "w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0",
+                              "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
                               isNavigating && index === currentStepIndex
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-secondary"
+                                ? "bg-[#4285F4] text-white"
+                                : "bg-gray-300 text-gray-600"
                             )}>
                               {getManeuverIcon(step.maneuver)}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="font-medium text-sm">{step.instruction}</p>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="font-medium text-sm text-gray-900">{step.instruction}</p>
+                              <p className="text-xs text-[#5f6368]">
                                 {isNavigating && index === currentStepIndex && distanceToNextStep !== null
                                   ? `${formatDistance(distanceToNextStep)} away`
                                   : `${formatDistance(step.distance)} · ${formatDuration(step.duration)}`
@@ -819,32 +861,30 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                   )}
                 </AnimatePresence>
 
-                {/* Action buttons */}
+                {/* Action buttons - Google Maps style */}
                 <div className="flex gap-3">
-                  <Button
-                    variant="outline"
+                  <button
                     onClick={isNavigating ? handleStopNavigation : handleClearDestination}
-                    className="flex-1 h-12"
+                    className="flex-1 h-12 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 transition-colors"
                   >
                     {isNavigating ? "End" : "Cancel"}
-                  </Button>
+                  </button>
                   {!isNavigating ? (
-                    <Button
+                    <button
                       onClick={handleStartNavigation}
                       disabled={!route || isLoadingRoute}
-                      className="flex-1 h-12 bg-primary"
+                      className="flex-1 h-12 rounded-lg bg-[#4285F4] font-medium text-white hover:bg-[#3367D6] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                     >
                       {isLoadingRoute ? (
-                        <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                        <Loader2 className="w-5 h-5 animate-spin" />
                       ) : (
-                        <Navigation className="w-5 h-5 mr-2" />
+                        <Navigation className="w-5 h-5" />
                       )}
                       {isLoadingRoute ? "Getting route..." : "Start"}
-                    </Button>
+                    </button>
                   ) : (
-                    <Button
+                    <button
                       onClick={() => {
-                        // Re-announce current step
                         if (route && route.steps[currentStepIndex] && livePosition) {
                           const dist = calculateDistanceMeters(
                             livePosition.lat,
@@ -855,20 +895,20 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
                           voiceNavRef.current.announceStep(route.steps[currentStepIndex], dist);
                         }
                       }}
-                      className="flex-1 h-12"
+                      className="flex-1 h-12 rounded-lg border border-gray-300 bg-white font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
                     >
-                      <Volume2 className="w-5 h-5 mr-2" />
+                      <Volume2 className="w-5 h-5" />
                       Repeat
-                    </Button>
+                    </button>
                   )}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Current navigation step overlay */}
+      {/* Current navigation step overlay - Google Maps style */}
       <AnimatePresence>
         {isNavigating && route && route.steps[currentStepIndex] && (
           <motion.div
@@ -877,46 +917,43 @@ export function InAppNavigation({ currentPosition }: InAppNavigationProps) {
             exit={{ opacity: 0, y: -20 }}
             className="absolute top-20 left-4 right-4 z-[1000]"
           >
-            <Card className="bg-primary text-primary-foreground shadow-lg">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-                    {getManeuverIcon(route.steps[currentStepIndex].maneuver)}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-lg">{route.steps[currentStepIndex].instruction}</p>
-                    <p className="text-primary-foreground/80 text-sm">
-                      {distanceToNextStep !== null 
-                        ? `${formatDistance(distanceToNextStep)} away`
-                        : formatDistance(route.steps[currentStepIndex].distance)
-                      }
-                    </p>
-                  </div>
+            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[#E8F0FE] flex items-center justify-center text-[#4285F4]">
+                  {getManeuverIcon(route.steps[currentStepIndex].maneuver)}
                 </div>
-                
-                {/* Step indicator */}
-                <div className="flex items-center justify-between mt-3 pt-3 border-t border-primary-foreground/20">
-                  <span className="text-sm text-primary-foreground/70">
-                    Step {currentStepIndex + 1} of {route.steps.length}
-                  </span>
-                  <div className="flex gap-1">
-                    {route.steps.map((_, idx) => (
-                      <div
-                        key={idx}
-                        className={cn(
-                          "w-2 h-2 rounded-full",
-                          idx === currentStepIndex
-                            ? "bg-primary-foreground"
-                            : idx < currentStepIndex
-                            ? "bg-primary-foreground/50"
-                            : "bg-primary-foreground/20"
-                        )}
-                      />
-                    ))}
-                  </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-900">{route.steps[currentStepIndex].instruction}</p>
+                  <p className="text-sm text-[#5f6368]">
+                    {distanceToNextStep !== null 
+                      ? `${formatDistance(distanceToNextStep)} away`
+                      : formatDistance(route.steps[currentStepIndex].distance)
+                    }
+                  </p>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
+              
+              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <span className="text-sm text-[#5f6368]">
+                  Step {currentStepIndex + 1} of {route.steps.length}
+                </span>
+                <div className="flex gap-1">
+                  {route.steps.map((_, idx) => (
+                    <div
+                      key={idx}
+                      className={cn(
+                        "w-2 h-2 rounded-full",
+                        idx === currentStepIndex
+                          ? "bg-[#4285F4]"
+                          : idx < currentStepIndex
+                          ? "bg-[#4285F4]/50"
+                          : "bg-gray-200"
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

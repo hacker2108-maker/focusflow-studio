@@ -65,7 +65,7 @@ export default function Focus() {
           // Send notification (works on iOS, Android, and web)
           scheduleNotification(
             Date.now(),
-            "Focus session complete! 🎉",
+            "Focus session complete!",
             timer.task || "Great work! Time for a break.",
             new Date()
           );

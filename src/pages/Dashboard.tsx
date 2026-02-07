@@ -42,7 +42,7 @@ export default function Dashboard() {
     <div className="space-y-6 animate-fade-in pb-24 overflow-y-auto">
       <header className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-display-sm text-foreground">Dashboard</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold text-foreground tracking-tight">Dashboard</h1>
           <p className="text-muted-foreground mt-1">{formatDate(new Date(), "EEEE, MMMM d")}</p>
         </div>
       </header>
@@ -50,9 +50,8 @@ export default function Dashboard() {
       {/* Time and Weather Widgets */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <TimeWidget />
-        <WeatherWidget compact />
+        <WeatherWidget />
       </div>
-      <WeatherWidget />
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -96,18 +95,22 @@ export default function Dashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-2 gap-3">
         <Link to="/focus">
-          <Card className="glass border-primary/20 hover:border-primary/40 transition-colors cursor-pointer h-full">
+          <Card className="glass border-primary/20 hover:border-primary/40 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full group">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-              <Timer className="w-8 h-8 text-primary mb-2" />
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
+                <Timer className="w-6 h-6 text-primary" />
+              </div>
               <p className="font-semibold">Start Focus</p>
               <p className="text-xs text-muted-foreground">25 min Pomodoro</p>
             </CardContent>
           </Card>
         </Link>
         <Link to="/journal">
-          <Card className="glass hover:border-primary/20 transition-colors cursor-pointer h-full">
+          <Card className="glass hover:border-primary/20 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full group">
             <CardContent className="p-4 flex flex-col items-center justify-center text-center h-full">
-              <BookOpen className="w-8 h-8 text-primary mb-2" />
+              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center mb-2 group-hover:bg-primary/20 transition-colors">
+                <BookOpen className="w-6 h-6 text-primary" />
+              </div>
               <p className="font-semibold">Write Journal</p>
               <p className="text-xs text-muted-foreground">Capture thoughts</p>
             </CardContent>
@@ -183,7 +186,7 @@ export default function Dashboard() {
 
 function StatCard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
   return (
-    <Card className="glass">
+    <Card className="glass hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-default">
       <CardContent className="p-4">
         <Icon className={`w-5 h-5 ${color} mb-2`} />
         <p className="text-xl font-bold">{value}</p>

@@ -32,14 +32,14 @@ interface CalendarState {
 }
 
 export const EVENT_COLORS = [
-  "#F59E0B", // Amber
-  "#EF4444", // Red
-  "#10B981", // Emerald
-  "#3B82F6", // Blue
-  "#8B5CF6", // Violet
-  "#EC4899", // Pink
-  "#06B6D4", // Cyan
-  "#84CC16", // Lime
+  "#1a1a1a", // Black
+  "#404040", // Dark gray
+  "#525252", // Gray
+  "#737373", // Medium gray
+  "#a3a3a3", // Light gray
+  "#262626", // Charcoal
+  "#171717", // Near black
+  "#334155", // Slate
 ] as const;
 
 export const useCalendarStore = create<CalendarState>((set, get) => ({

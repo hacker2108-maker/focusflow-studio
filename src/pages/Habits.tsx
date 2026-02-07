@@ -94,12 +94,12 @@ export default function Habits() {
     <div key={refreshKey} className="space-y-6 animate-fade-in pb-24">
       <header className="flex items-center justify-between">
         <div>
-          <h1 className="text-display-sm">Habits</h1>
+          <h1 className="text-2xl md:text-3xl font-semibold tracking-tight">Habits</h1>
           <p className="text-muted-foreground mt-1">Build consistent routines</p>
         </div>
         <Button 
           onClick={() => setIsOpen(true)}
-          className="gradient-primary text-primary-foreground shadow-glow"
+          className="rounded-full bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
         >
           <Plus className="w-4 h-4 mr-2" />
           New Habit
@@ -115,10 +115,10 @@ export default function Habits() {
       />
 
       <Tabs value={filter} onValueChange={v => setFilter(v as HabitFilter)}>
-        <TabsList className="glass">
-          <TabsTrigger value="today">Today</TabsTrigger>
-          <TabsTrigger value="active">Active</TabsTrigger>
-          <TabsTrigger value="archived">Archived</TabsTrigger>
+        <TabsList className="rounded-full bg-muted/50 p-1">
+          <TabsTrigger value="today" className="rounded-full data-[state=active]:bg-background data-[state=active]:shadow-sm">Today</TabsTrigger>
+          <TabsTrigger value="active" className="rounded-full data-[state=active]:bg-background data-[state=active]:shadow-sm">Active</TabsTrigger>
+          <TabsTrigger value="archived" className="rounded-full data-[state=active]:bg-background data-[state=active]:shadow-sm">Archived</TabsTrigger>
         </TabsList>
       </Tabs>
 
@@ -168,16 +168,19 @@ export default function Habits() {
                   transition={{ delay: i * 0.03 }}
                 >
                   <Card 
-                    className={`glass hover-lift cursor-pointer overflow-hidden ${isDone ? "border-success/30" : ""}`}
+                    className={`glass hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer overflow-hidden ${isDone ? "border-success/30" : ""}`}
                     onClick={() => setDetailHabit(habit)}
                   >
                     <CardContent className="p-0">
                       {/* Main content */}
                       <div className="p-4 flex items-center gap-4">
-                        {/* Icon/Color indicator */}
+                        {/* Icon/Color indicator - habit app style */}
                         <div 
-                          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform"
-                          style={{ backgroundColor: (habit.color || "hsl(var(--primary))") + "20" }}
+                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 transition-transform ring-2 ring-offset-2"
+                          style={{ 
+                            backgroundColor: (habit.color || "hsl(var(--primary))") + "25",
+                            boxShadow: isDone ? `inset 0 0 0 2px ${habit.color || "hsl(var(--primary))"}` : "none"
+                          }}
                         >
                           {isDone ? (
                             <motion.div
@@ -186,10 +189,10 @@ export default function Habits() {
                               className="w-6 h-6 rounded-full flex items-center justify-center"
                               style={{ backgroundColor: habit.color || "hsl(var(--primary))" }}
                             >
-                              <span className="text-white text-sm">✓</span>
+                              <span className="text-primary-foreground text-sm font-bold">✓</span>
                             </motion.div>
                           ) : (
-                            <Flame className="w-5 h-5" style={{ color: habit.color || "hsl(var(--primary))" }} />
+                            <Flame className="w-6 h-6" style={{ color: habit.color || "hsl(var(--primary))" }} />
                           )}
                         </div>
 
@@ -263,23 +266,24 @@ export default function Habits() {
                         </DropdownMenu>
                       </div>
 
-                      {/* Weekly progress bar */}
+                      {/* Weekly progress bar - habit app style */}
                       <div className="px-4 pb-3">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center gap-1.5">
                           {last7Days.map((completed, idx) => (
                             <div 
                               key={idx}
-                              className={`flex-1 h-1.5 rounded-full transition-all ${
-                                completed ? "" : "bg-secondary"
+                              className={`flex-1 h-2 rounded-full transition-all ${
+                                completed ? "" : "bg-muted"
                               }`}
                               style={completed ? { backgroundColor: habit.color || "hsl(var(--primary))" } : {}}
+                              title={completed ? "Completed" : "Missed"}
                             />
                           ))}
                         </div>
-                        <div className="flex justify-between mt-1.5">
-                          <span className="text-2xs text-muted-foreground">Last 7 days</span>
-                          <span className="text-2xs font-medium" style={{ color: habit.color || "hsl(var(--primary))" }}>
-                            {weeklyRate}% complete
+                        <div className="flex justify-between mt-2">
+                          <span className="text-xs text-muted-foreground">Last 7 days</span>
+                          <span className="text-xs font-medium" style={{ color: habit.color || "hsl(var(--primary))" }}>
+                            {weeklyRate}%
                           </span>
                         </div>
                       </div>

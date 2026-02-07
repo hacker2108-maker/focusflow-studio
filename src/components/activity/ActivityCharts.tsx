@@ -65,7 +65,7 @@ export function ActivityCharts({ activities }: ActivityChartsProps) {
   const totalCalories = data.reduce((sum, d) => sum + d.calories, 0);
 
   return (
-    <Card className="glass">
+    <Card className="glass hover:shadow-md transition-shadow">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <CardTitle className="text-lg">Activity Trends</CardTitle>
         <Tabs value={period} onValueChange={(v) => setPeriod(v as "week" | "month")}>

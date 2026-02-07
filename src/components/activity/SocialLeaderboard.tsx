@@ -139,7 +139,7 @@ export function SocialLeaderboard() {
     <div className="space-y-6">
       {/* Pending Friend Requests */}
       {pendingRequests.length > 0 && (
-        <Card className="glass border-primary/30">
+        <Card className="glass border-primary/30 hover:shadow-md transition-shadow">
           <CardHeader className="pb-2">
             <CardTitle className="text-lg flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-primary" />
@@ -181,7 +181,7 @@ export function SocialLeaderboard() {
       )}
 
       {/* Leaderboard */}
-      <Card className="glass">
+      <Card className="glass hover:shadow-md transition-shadow">
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg flex items-center gap-2">
