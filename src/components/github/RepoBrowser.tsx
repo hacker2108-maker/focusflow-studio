@@ -12,9 +12,28 @@ import {
   Save,
   Check,
   ExternalLink,
+  MoreHorizontal,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useGitHubStore, type GitHubRepo } from "@/store/githubStore";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -59,12 +78,16 @@ export function RepoBrowser({
   repo,
   open,
   onOpenChange,
+  fullPage = false,
 }: {
   repo: GitHubRepo | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  fullPage?: boolean;
 }) {
-  const { accessToken } = useGitHubStore();
+  const { accessToken, deleteRepo } = useGitHubStore();
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [path, setPath] = useState<string[]>([]);
   const [contents, setContents] = useState<GitHubContentItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -199,6 +222,46 @@ export function RepoBrowser({
     }
   };
 
+  const handleDeleteRepo = async () => {
+    if (!repo || !accessToken) return;
+    setDeleting(true);
+    try {
+      const ok = await deleteRepo(repo.full_name);
+      if (ok) {
+        toast.success("Repository deleted");
+        onOpenChange(false);
+      } else {
+        toast.error("Failed to delete repository");
+      }
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleShareRepo = async () => {
+    if (!repo) return;
+    const shareUrl = repo.html_url;
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: repo.name,
+          url: shareUrl,
+          text: repo.description || undefined,
+        });
+        toast.success("Shared!");
+      } catch (e) {
+        if ((e as Error).name !== "AbortError") {
+          navigator.clipboard.writeText(shareUrl);
+          toast.success("Link copied to clipboard");
+        }
+      }
+    } else {
+      navigator.clipboard.writeText(shareUrl);
+      toast.success("Link copied to clipboard");
+    }
+  };
+
   const goBack = () => {
     if (path.length > 0) {
       setPath(path.slice(0, -1));
@@ -218,7 +281,7 @@ export function RepoBrowser({
         <Button variant="ghost" size="sm" onClick={path.length ? goBack : () => onOpenChange(false)}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
-        <div className="flex items-center gap-1 overflow-x-auto text-sm">
+        <div className="flex items-center gap-1 overflow-x-auto text-sm flex-1 min-w-0">
           <button
             onClick={() => {
               setPath([]);
@@ -243,7 +306,59 @@ export function RepoBrowser({
             </span>
           ))}
         </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="shrink-0">
+              <MoreHorizontal className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={handleShareRepo}>
+              <Share2 className="w-4 h-4 mr-2" />
+              Share
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View on GitHub
+              </a>
+            </DropdownMenuItem>
+            {accessToken && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={() => setDeleteDialogOpen(true)}
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete repository
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete repository?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{repo?.full_name}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => { e.preventDefault(); handleDeleteRepo(); }}
+              disabled={deleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="flex-1 flex min-h-0">
         {/* File tree */}

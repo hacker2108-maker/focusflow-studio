@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import ReactMarkdown from "react-markdown";
 import {
   Github,
   Star,
@@ -10,15 +10,46 @@ import {
   Unplug,
   RefreshCw,
   AlertCircle,
+  Plus,
+  MoreHorizontal,
+  Share2,
+  ExternalLink,
+  Trash2,
 } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { RepoBrowser } from "@/components/github/RepoBrowser";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useGitHubStore, type GitHubRepo } from "@/store/githubStore";
+import { toast } from "sonner";
+import { Switch } from "@/components/ui/switch";
 import { formatDistanceToNow } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -213,6 +244,7 @@ function ContributionPlant({ pushesThisWeek }: { pushesThisWeek: number }) {
 }
 
 export default function GitHub() {
+  const navigate = useNavigate();
   const {
     username,
     user,
@@ -222,13 +254,22 @@ export default function GitHub() {
     contributionMap,
     isLoading,
     error,
+    accessToken,
     fetchUserAndRepos,
+    createRepo,
+    deleteRepo,
     disconnect,
   } = useGitHubStore();
 
   const [inputUsername, setInputUsername] = useState(username || "");
-  const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
-  const [repoViewerOpen, setRepoViewerOpen] = useState(false);
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createName, setCreateName] = useState("");
+  const [createDesc, setCreateDesc] = useState("");
+  const [createPrivate, setCreatePrivate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [repoToDelete, setRepoToDelete] = useState<GitHubRepo | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const handleConnect = () => {
     const trimmed = inputUsername.trim();
@@ -236,8 +277,64 @@ export default function GitHub() {
   };
 
   const handleRepoClick = (repo: GitHubRepo) => {
-    setSelectedRepo(repo);
-    setRepoViewerOpen(true);
+    const [owner] = repo.full_name.split("/");
+    navigate(`/github/repo/${owner}/${repo.name}`);
+  };
+
+  const handleCreateRepo = async () => {
+    const name = createName.trim();
+    if (!name) return;
+    setCreating(true);
+    try {
+      const repo = await createRepo(name, createDesc || undefined, createPrivate);
+      if (repo) {
+        toast.success("Repository created!");
+        setCreateDialogOpen(false);
+        setCreateName("");
+        setCreateDesc("");
+        setCreatePrivate(false);
+        navigate(`/github/repo/${repo.full_name.split("/")[0]}/${repo.name}`);
+      } else {
+        throw new Error("Failed to create");
+      }
+    } catch {
+      // Error handled by createRepo returning null
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleDeleteRepo = async () => {
+    if (!repoToDelete || !accessToken) return;
+    setDeleting(true);
+    try {
+      const ok = await deleteRepo(repoToDelete.full_name);
+      if (ok) {
+        toast.success("Repository deleted");
+        setDeleteDialogOpen(false);
+      } else {
+        toast.error("Failed to delete repository");
+      }
+      setRepoToDelete(null);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleShareRepo = async (repo: GitHubRepo, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: repo.name, url: repo.html_url });
+        toast.success("Shared!");
+      } catch {
+        navigator.clipboard.writeText(repo.html_url);
+        toast.success("Link copied to clipboard");
+      }
+    } else {
+      navigator.clipboard.writeText(repo.html_url);
+      toast.success("Link copied to clipboard");
+    }
   };
 
   const isInactive = pushesThisWeek === 0 && username;
@@ -379,6 +476,24 @@ export default function GitHub() {
             </CardContent>
           </Card>
 
+          {/* Token hint */}
+          {!accessToken && username && (
+            <Card className="glass border-amber-500/30 bg-amber-950/5">
+              <CardContent className="p-4 flex items-center gap-3">
+                <AlertCircle className="w-5 h-5 text-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Add a token for full power</p>
+                  <p className="text-xs text-muted-foreground">
+                    Create, edit, and delete repos from the app. Add a Personal Access Token in Settings.
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" onClick={() => navigate("/settings")}>
+                  Settings
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+
           {/* User profile */}
           {user && (
             <Card className="glass border-none">
@@ -400,84 +515,206 @@ export default function GitHub() {
           )}
 
           {/* Repositories */}
-          <Card className="glass border-none">
+          <Card className="glass border-none overflow-hidden">
             <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center justify-between">
-                Your Repositories
-                <span className="text-xs text-muted-foreground font-normal">{repos.length} repos</span>
-              </CardTitle>
-              <p className="text-xs text-muted-foreground">Tap to browse, view, edit and share in app</p>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    Your Repositories
+                    <span className="text-xs text-muted-foreground font-normal">{repos.length} repos</span>
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">Click to open full-page. Share, edit, delete from the menu.</p>
+                </div>
+                {accessToken && (
+                  <Button
+                    size="sm"
+                    onClick={() => setCreateDialogOpen(true)}
+                    className="shrink-0"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    New repo
+                  </Button>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="space-y-2">
               {repos.length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Github className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p>No public repositories found</p>
+                <div className="text-center py-12 text-muted-foreground">
+                  <Github className="w-14 h-14 mx-auto mb-4 opacity-40" />
+                  <p className="font-medium">No repositories yet</p>
+                  <p className="text-sm mt-1">Connect with a username that has public repos, or create one below.</p>
+                  {accessToken && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-4"
+                      onClick={() => setCreateDialogOpen(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create repository
+                    </Button>
+                  )}
                 </div>
               ) : (
-                repos.slice(0, 20).map((repo) => (
-                  <motion.button
+                repos.slice(0, 30).map((repo) => (
+                  <motion.div
                     key={repo.id}
-                    onClick={() => handleRepoClick(repo)}
-                    className="w-full flex items-center gap-4 p-3 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-colors group text-left"
                     initial={{ opacity: 0, y: 5 }}
                     animate={{ opacity: 1, y: 0 }}
+                    className="group"
                   >
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate group-hover:text-primary">
-                        {repo.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground truncate">
-                        {repo.description || "No description"}
-                      </p>
-                      <div className="flex gap-4 mt-1 text-xs text-muted-foreground">
-                        {repo.language && (
+                    <div
+                      onClick={() => handleRepoClick(repo)}
+                      className="w-full flex items-center gap-4 p-4 rounded-xl bg-secondary/30 hover:bg-secondary/50 transition-all cursor-pointer border border-transparent hover:border-border/50 text-left"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate group-hover:text-primary transition-colors">
+                          {repo.name}
+                        </p>
+                        <p className="text-sm text-muted-foreground truncate mt-0.5">
+                          {repo.description || "No description"}
+                        </p>
+                        <div className="flex flex-wrap gap-4 mt-2 text-xs text-muted-foreground">
+                          {repo.language && (
+                            <span className="flex items-center gap-1.5">
+                              <span
+                                className="w-2 h-2 rounded-full shrink-0"
+                                style={{
+                                  backgroundColor:
+                                    repo.language === "JavaScript"
+                                      ? "#f7df1e"
+                                      : repo.language === "TypeScript"
+                                      ? "#3178c6"
+                                      : repo.language === "Python"
+                                      ? "#3776ab"
+                                      : "hsl(var(--muted-foreground))",
+                                }}
+                              />
+                              {repo.language}
+                            </span>
+                          )}
                           <span className="flex items-center gap-1">
-                            <span
-                              className="w-2 h-2 rounded-full"
-                              style={{
-                                backgroundColor:
-                                  repo.language === "JavaScript"
-                                    ? "#f7df1e"
-                                    : repo.language === "TypeScript"
-                                    ? "#3178c6"
-                                    : repo.language === "Python"
-                                    ? "#3776ab"
-                                    : "hsl(var(--muted-foreground))",
-                              }}
-                            />
-                            {repo.language}
+                            <Star className="w-3.5 h-3.5" />
+                            {repo.stargazers_count}
                           </span>
-                        )}
-                        <span className="flex items-center gap-1">
-                          <Star className="w-3 h-3" />
-                          {repo.stargazers_count}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <GitFork className="w-3 h-3" />
-                          {repo.forks_count}
-                        </span>
+                          <span className="flex items-center gap-1">
+                            <GitFork className="w-3.5 h-3.5" />
+                            {repo.forks_count}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="w-4 h-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleRepoClick(repo)}>
+                              <ChevronRight className="w-4 h-4 mr-2" />
+                              Open
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => handleShareRepo(repo, e as unknown as React.MouseEvent)}>
+                              <Share2 className="w-4 h-4 mr-2" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuItem asChild>
+                              <a href={repo.html_url} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                View on GitHub
+                              </a>
+                            </DropdownMenuItem>
+                            {accessToken && (
+                              <>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive focus:text-destructive"
+                                  onClick={() => { setRepoToDelete(repo); setDeleteDialogOpen(true); }}
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <ChevronRight className="w-4 h-4 text-muted-foreground ml-1" />
                       </div>
                     </div>
-                    <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary" />
-                  </motion.button>
+                  </motion.div>
                 ))
               )}
             </CardContent>
           </Card>
 
-          <Sheet open={repoViewerOpen} onOpenChange={setRepoViewerOpen}>
-            <SheetContent
-              side="right"
-              className="w-full sm:max-w-2xl md:max-w-4xl lg:max-w-5xl p-0 flex flex-col h-full"
-            >
-              <RepoBrowser
-                repo={selectedRepo}
-                open={repoViewerOpen}
-                onOpenChange={setRepoViewerOpen}
-              />
-            </SheetContent>
-          </Sheet>
+          {/* Create repo dialog */}
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create repository</DialogTitle>
+                <DialogDescription>
+                  Create a new repository on your GitHub account. You need a token with repo scope in Settings.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                <div className="space-y-2">
+                  <Label htmlFor="repo-name">Name</Label>
+                  <Input
+                    id="repo-name"
+                    placeholder="my-awesome-repo"
+                    value={createName}
+                    onChange={(e) => setCreateName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="repo-desc">Description (optional)</Label>
+                  <Textarea
+                    id="repo-desc"
+                    placeholder="A short description of your project"
+                    value={createDesc}
+                    onChange={(e) => setCreateDesc(e.target.value)}
+                    rows={2}
+                  />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="repo-private">Private</Label>
+                  <Switch id="repo-private" checked={createPrivate} onCheckedChange={setCreatePrivate} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setCreateDialogOpen(false)} disabled={creating}>
+                  Cancel
+                </Button>
+                <Button onClick={handleCreateRepo} disabled={creating || !createName.trim()}>
+                  {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-4 h-4 mr-2" />}
+                  {creating ? "Creating…" : "Create"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Delete repo dialog */}
+          <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete repository?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete <strong>{repoToDelete?.full_name}</strong>. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={(e) => { e.preventDefault(); handleDeleteRepo(); }}
+                  disabled={deleting}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                >
+                  {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </>
       )}
     </div>

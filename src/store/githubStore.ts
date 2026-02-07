@@ -38,6 +38,8 @@ interface GitHubStore {
   setUsername: (username: string | null) => void;
   setAccessToken: (token: string | null) => void;
   fetchUserAndRepos: (username: string) => Promise<void>;
+  createRepo: (name: string, description?: string, isPrivate?: boolean) => Promise<GitHubRepo | null>;
+  deleteRepo: (fullName: string) => Promise<boolean>;
   disconnect: () => void;
 }
 
@@ -116,6 +118,44 @@ export const useGitHubStore = create<GitHubStore>()(
             isLoading: false,
             error: err instanceof Error ? err.message : "Something went wrong",
           });
+        }
+      },
+
+      createRepo: async (name: string, description?: string, isPrivate?: boolean) => {
+        const { accessToken } = get();
+        if (!accessToken) return null;
+        try {
+          const res = await fetch(`${GITHUB_API}/user/repos`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+              Accept: "application/vnd.github+json",
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ name, description: description || "", private: isPrivate ?? false }),
+          });
+          if (!res.ok) throw new Error("Failed to create repo");
+          const repo = await res.json();
+          set((s) => ({ repos: [repo, ...s.repos] }));
+          return repo;
+        } catch {
+          return null;
+        }
+      },
+
+      deleteRepo: async (fullName: string) => {
+        const { accessToken } = get();
+        if (!accessToken) return false;
+        try {
+          const res = await fetch(`${GITHUB_API}/repos/${fullName}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!res.ok) throw new Error("Failed to delete");
+          set((s) => ({ repos: s.repos.filter((r) => r.full_name !== fullName) }));
+          return true;
+        } catch {
+          return false;
         }
       },
 
