@@ -279,19 +279,23 @@ export default function GitHub() {
     }
   }, [session?.provider_token, connectFromOAuthToken]);
 
-  // Sync from Supabase on mount (cross-device: laptop → phone) and refetch fresh data
+  // Sync from Supabase on mount, then always refresh contributions (fixes stale/empty data)
   useEffect(() => {
     let cancelled = false;
     (async () => {
       await syncFromSupabase();
       if (cancelled) return;
       const state = useGitHubStore.getState();
-      if (state.username && !state.accessToken) {
-        await fetchUserAndRepos(state.username);
+      if (state.username) {
+        if (!state.accessToken && (!state.repos?.length || !state.user)) {
+          await fetchUserAndRepos(state.username);
+        } else {
+          await refreshContributions();
+        }
       }
     })();
     return () => { cancelled = true; };
-  }, [syncFromSupabase, fetchUserAndRepos]);
+  }, [syncFromSupabase, fetchUserAndRepos, refreshContributions]);
 
   // Poll for new pushes. Commits API = real-time; Events API = 30s–6h delay.
   useEffect(() => {

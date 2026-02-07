@@ -318,8 +318,6 @@ export const useGitHubStore = create<GitHubStore>()(
               const commit = c.commit;
               const date = commit?.author?.date || commit?.committer?.date;
               if (!date) continue;
-              const authorLogin = (c.author?.login || c.committer?.login || "").toLowerCase();
-              if (authorLogin && authorLogin !== username.toLowerCase()) continue; // filter out others' commits
               const eventDate = new Date(date);
               const dateStr = eventDate.toISOString().split("T")[0];
               contributionMap[dateStr] = (contributionMap[dateStr] || 0) + 1;
@@ -357,20 +355,26 @@ export const useGitHubStore = create<GitHubStore>()(
       },
 
       refreshContributions: async () => {
-        const { username, repos } = get();
+        const { username, repos, accessToken } = get();
         if (!username) return { ok: false, count: 0 };
         set({ isLoading: true });
         try {
-          let count = 0;
-          if (repos.length > 0) {
-            const ok = await get().refreshFromCommits();
-            if (ok) count = get().pushesThisWeek;
+          if (repos.length === 0 && accessToken) {
+            const reposRes = await fetch(`${GITHUB_API}/user/repos?sort=updated&per_page=100`, {
+              headers: { Authorization: `Bearer ${accessToken}`, Accept: "application/vnd.github+json" },
+            });
+            if (reposRes.ok) {
+              const reposData = await reposRes.json();
+              set({ repos: reposData });
+            }
           }
-          if (count === 0) {
+          if (get().repos.length > 0) {
+            await get().refreshFromCommits();
+          }
+          if (get().pushesThisWeek === 0) {
             await get().refreshEvents();
-            count = get().pushesThisWeek;
           }
-          if (count === 0 && repos.length === 0) {
+          if (get().pushesThisWeek === 0 && get().repos.length === 0 && !accessToken) {
             await get().fetchUserAndRepos(username);
           }
           return { ok: true, count: get().pushesThisWeek };
