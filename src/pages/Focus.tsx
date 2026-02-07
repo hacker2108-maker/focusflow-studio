@@ -1,10 +1,10 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2, Settings, Volume2, VolumeX, Minus, Plus, Bell } from "lucide-react";
 import { useFocusStore } from "@/store/focusStore";
 import { useHabitStore } from "@/store/habitStore";
 import { formatTime, getToday, isHabitDueToday } from "@/lib/utils";
 import { alarmSound, AlarmSoundType } from "@/lib/audio";
-import { requestNotificationPermission, scheduleNotification } from "@/lib/notifications";
+import { requestNotificationPermission, scheduleNotification, scheduleTimerNotificationViaSW } from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ export default function Focus() {
   const [task, setTask] = useState("");
   const [showCompleteDialog, setShowCompleteDialog] = useState(false);
   const [showSettingsDialog, setShowSettingsDialog] = useState(false);
+  const hasHandledCompletionRef = useRef(false);
   const today = getToday();
 
   const todayHabits = habits.filter(h => !h.archived && isHabitDueToday(h));
@@ -43,23 +44,24 @@ export default function Focus() {
   useEffect(() => {
     if (!timer.isRunning || timer.isPaused) {
       setTimeRemaining(getTimeRemaining());
+      hasHandledCompletionRef.current = false;
       return;
     }
+
+    // Reset when starting a new phase so break completion can fire
+    hasHandledCompletionRef.current = false;
 
     const interval = setInterval(() => {
       const remaining = getTimeRemaining();
       setTimeRemaining(remaining);
 
-      if (remaining <= 0) {
+      if (remaining <= 0 && !hasHandledCompletionRef.current) {
+        hasHandledCompletionRef.current = true;
         if (timer.phase === "work") {
           setShowCompleteDialog(true);
           alarmSound.playAlarm(preset.alarmSound);
-          scheduleNotification(
-            Date.now(),
-            "Focus session complete!",
-            timer.task || "Great work! Time for a break.",
-            new Date()
-          );
+          // Notification shown via service worker (scheduled at timer start)
+          scheduleNotification(Date.now(), "Focus session complete!", timer.task || "Great work! Time for a break.", new Date());
         } else {
           alarmSound.playBreakEnd(preset.alarmSound);
           toast.success("Break complete! Ready for the next session?");
@@ -99,6 +101,27 @@ export default function Focus() {
     startTimer(mode, task.trim() || undefined, duration);
     toast.success(`${mode === "pomodoro" ? "Pomodoro" : "Deep Focus"} started`);
   };
+
+  // Schedule SW notification when phase changes (break → work, work → break)
+  useEffect(() => {
+    if (!timer.isRunning || timer.isPaused || !timer.startTimestamp) return;
+    const endTime = timer.startTimestamp + timer.totalDuration * 1000;
+    // Only schedule if end time is in the future (avoid immediate notification on page load)
+    if (endTime <= Date.now() + 1000) return;
+    if (timer.phase === "work") {
+      scheduleTimerNotificationViaSW(
+        endTime,
+        "Focus session complete!",
+        timer.task || "Great work! Time for a break."
+      );
+    } else {
+      scheduleTimerNotificationViaSW(
+        endTime,
+        "Break is over! ☕",
+        "Ready for the next focus session?"
+      );
+    }
+  }, [timer.isRunning, timer.isPaused, timer.startTimestamp, timer.phase, timer.totalDuration, timer.task]);
 
   const handleComplete = (markHabits: string[] = []) => {
     completeSession();

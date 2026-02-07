@@ -167,19 +167,7 @@ export const useFocusStore = create<FocusState>()(
         const elapsed = get().getElapsedTime();
         const durationMinutes = Math.floor(elapsed / 60);
 
-        // Log the session to database
-        if (durationMinutes > 0) {
-          await get().addSession({
-            date: getToday(),
-            startTime: timer.startTimestamp || Date.now(),
-            durationMinutes,
-            mode: timer.mode,
-            task: timer.task,
-            note,
-            completed: true,
-          });
-        }
-
+        // Update timer state FIRST so UI responds immediately (fixes multiple Continue clicks)
         // Handle pomodoro phases
         if (timer.mode === "pomodoro" && timer.phase === "work") {
           const nextSession = timer.currentSession + 1;
@@ -212,6 +200,19 @@ export const useFocusStore = create<FocusState>()(
         } else {
           // Deep focus - just reset
           set({ timer: getInitialTimer() });
+        }
+
+        // Log the session to database (fire-and-forget, don't block UI)
+        if (durationMinutes > 0) {
+          void get().addSession({
+            date: getToday(),
+            startTime: timer.startTimestamp || Date.now(),
+            durationMinutes,
+            mode: timer.mode,
+            task: timer.task,
+            note,
+            completed: true,
+          });
         }
       },
 

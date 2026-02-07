@@ -1,6 +1,38 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Capacitor } from "@capacitor/core";
 
+/** Register service worker for background notifications when tab is closed */
+export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
+  if (!("serviceWorker" in navigator) || Capacitor.isNativePlatform()) return null;
+  try {
+    const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    return reg;
+  } catch (e) {
+    console.warn("Service worker registration failed:", e);
+    return null;
+  }
+}
+
+/** Schedule timer notification via service worker - works when tab is closed/minimized */
+export async function scheduleTimerNotificationViaSW(
+  endTime: number,
+  title: string,
+  body: string
+): Promise<void> {
+  if (Capacitor.isNativePlatform()) return;
+  try {
+    const reg = await navigator.serviceWorker?.ready;
+    reg?.active?.postMessage({
+      type: "SCHEDULE_TIMER_END",
+      endTime,
+      title,
+      body,
+    });
+  } catch {
+    // Silently fail - main page will show notification when tab is open
+  }
+}
+
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!Capacitor.isNativePlatform()) {
     // Use web notifications API
@@ -22,14 +54,18 @@ export async function scheduleNotification(
   scheduledAt: Date
 ): Promise<void> {
   if (!Capacitor.isNativePlatform()) {
-    // For web, we'll use a simple timeout if the time is within the session
+    // For web: show immediately if due now/past, or schedule if in the future
     const delay = scheduledAt.getTime() - Date.now();
-    if (delay > 0 && delay < 3600000) { // Within 1 hour
-      setTimeout(() => {
-        if ("Notification" in window && Notification.permission === "granted") {
-          new Notification(title, { body });
-        }
-      }, delay);
+    const showNow = () => {
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification(title, { body });
+      }
+    };
+    if (delay <= 0) {
+      showNow();
+    } else if (delay < 3600000) {
+      // Within 1 hour - use setTimeout (works when tab is focused or in background)
+      setTimeout(showNow, delay);
     }
     return;
   }
