@@ -41,7 +41,8 @@ interface GitHubStore {
   fetchUserAndRepos: (username: string) => Promise<void>;
   connectFromOAuthToken: (token: string) => Promise<void>;
   refreshEvents: () => Promise<void>;
-  refreshFromCommits: () => Promise<void>;
+  refreshFromCommits: () => Promise<boolean>;
+  refreshContributions: () => Promise<{ ok: boolean; count: number }>;
   createRepo: (name: string, description?: string, isPrivate?: boolean) => Promise<GitHubRepo | null>;
   deleteRepo: (fullName: string) => Promise<boolean>;
   disconnect: () => void | Promise<void>;
@@ -284,7 +285,7 @@ export const useGitHubStore = create<GitHubStore>()(
       // Commits API is real-time (Events API has 30s–6h delay). Use when we have repos.
       refreshFromCommits: async () => {
         const { username, repos, accessToken } = get();
-        if (!username || !repos.length) return;
+        if (!username || !repos.length) return false;
         try {
           const since = new Date();
           since.setDate(since.getDate() - 14 * 7);
@@ -303,7 +304,7 @@ export const useGitHubStore = create<GitHubStore>()(
           const results = await Promise.all(
             reposToFetch.map((repo) =>
               fetch(
-                `${GITHUB_API}/repos/${repo.full_name}/commits?since=${sinceISO}&author=${username}&per_page=100`,
+                `${GITHUB_API}/repos/${repo.full_name}/commits?since=${sinceISO}&per_page=100`,
                 { headers }
               )
             )
@@ -312,10 +313,13 @@ export const useGitHubStore = create<GitHubStore>()(
           for (const res of results) {
             if (!res.ok) continue;
             const commits = await res.json();
+            if (!Array.isArray(commits)) continue;
             for (const c of commits) {
               const commit = c.commit;
               const date = commit?.author?.date || commit?.committer?.date;
               if (!date) continue;
+              const authorLogin = (c.author?.login || c.committer?.login || "").toLowerCase();
+              if (authorLogin && authorLogin !== username.toLowerCase()) continue; // filter out others' commits
               const eventDate = new Date(date);
               const dateStr = eventDate.toISOString().split("T")[0];
               contributionMap[dateStr] = (contributionMap[dateStr] || 0) + 1;
@@ -346,8 +350,34 @@ export const useGitHubStore = create<GitHubStore>()(
           } catch {
             // Ignore storage errors
           }
+          return true;
         } catch {
-          // Silent fail
+          return false;
+        }
+      },
+
+      refreshContributions: async () => {
+        const { username, repos } = get();
+        if (!username) return { ok: false, count: 0 };
+        set({ isLoading: true });
+        try {
+          let count = 0;
+          if (repos.length > 0) {
+            const ok = await get().refreshFromCommits();
+            if (ok) count = get().pushesThisWeek;
+          }
+          if (count === 0) {
+            await get().refreshEvents();
+            count = get().pushesThisWeek;
+          }
+          if (count === 0 && repos.length === 0) {
+            await get().fetchUserAndRepos(username);
+          }
+          return { ok: true, count: get().pushesThisWeek };
+        } catch {
+          return { ok: false, count: 0 };
+        } finally {
+          set({ isLoading: false });
         }
       },
 

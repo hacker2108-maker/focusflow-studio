@@ -262,6 +262,7 @@ export default function GitHub() {
     connectFromOAuthToken,
     refreshEvents,
     refreshFromCommits,
+    refreshContributions,
     createRepo,
     deleteRepo,
     disconnect,
@@ -538,14 +539,18 @@ export default function GitHub() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        if (repos.length > 0) refreshFromCommits();
-                        else fetchUserAndRepos(username);
+                      onClick={async () => {
+                        const { ok, count } = await refreshContributions();
+                        if (ok) {
+                          toast.success(count > 0 ? `${count} push${count !== 1 ? "es" : ""} this week` : "Refreshed");
+                        } else {
+                          toast.error("Refresh failed");
+                        }
                       }}
                       disabled={isLoading}
                     >
                       <RefreshCw className={cn("w-4 h-4 mr-1", isLoading && "animate-spin")} />
-                      Just pushed? Refresh
+                      {isLoading ? "Refreshing…" : "Refresh"}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={disconnect}>
                       <Unplug className="w-4 h-4 mr-1" />
