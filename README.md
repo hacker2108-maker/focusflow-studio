@@ -50,6 +50,22 @@ npm run dev
 - Click on "New codespace" to launch a new Codespace environment.
 - Edit files directly within the Codespace and commit and push your changes once you're done.
 
+## GitHub OAuth Setup (one-time)
+
+For the "Connect with GitHub" button to work, configure GitHub in your Supabase project:
+
+1. **Supabase Dashboard** → [Authentication](https://supabase.com/dashboard/project/bimifcjflwuekavtswvc/auth/providers) → **Providers** → **GitHub**
+   - Enable GitHub
+   - Client ID: `Ov23ctH4svbBvROTxUx7`
+   - Client Secret: (your GitHub OAuth app secret)
+   - Save
+
+2. **General Auth** → Enable **"Allow manual linking"** (for linking GitHub to existing accounts)
+
+3. **GitHub OAuth App** → Add callback URL: `https://bimifcjflwuekavtswvc.supabase.co/auth/v1/callback`
+
+4. **Redirect URLs** in Supabase → Add your app URL (e.g. `https://your-app.lovable.app/*`)
+
 ## What technologies are used for this project?
 
 This project is built with:

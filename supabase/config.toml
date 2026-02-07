@@ -1,5 +1,14 @@
 project_id = "bimifcjflwuekavtswvc"
 
+[auth]
+# Enable manual linking for linkIdentity (connect GitHub to existing account)
+manual_linking_enabled = true
+
+[auth.external.github]
+enabled = true
+client_id = "Ov23ctH4svbBvROTxUx7"
+secret = "env(GITHUB_CLIENT_SECRET)"
+
 [functions.ai-assistant]
 verify_jwt = false
 

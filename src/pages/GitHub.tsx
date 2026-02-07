@@ -48,6 +48,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useGitHubStore, type GitHubRepo } from "@/store/githubStore";
+import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
 import { formatDistanceToNow } from "date-fns";
@@ -245,6 +246,7 @@ function ContributionPlant({ pushesThisWeek }: { pushesThisWeek: number }) {
 
 export default function GitHub() {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const {
     username,
     user,
@@ -257,10 +259,23 @@ export default function GitHub() {
     accessToken,
     fetchUserAndRepos,
     syncFromSupabase,
+    connectFromOAuthToken,
+    refreshEvents,
     createRepo,
     deleteRepo,
     disconnect,
   } = useGitHubStore();
+
+  // Sync provider_token from OAuth session when user returns from GitHub
+  useEffect(() => {
+    const token = session?.provider_token;
+    if (token) {
+      const state = useGitHubStore.getState();
+      if (state.accessToken !== token) {
+        connectFromOAuthToken(token);
+      }
+    }
+  }, [session?.provider_token, connectFromOAuthToken]);
 
   // Sync from Supabase on mount (cross-device: laptop → phone) and refetch fresh data
   useEffect(() => {
@@ -269,12 +284,31 @@ export default function GitHub() {
       await syncFromSupabase();
       if (cancelled) return;
       const state = useGitHubStore.getState();
-      if (state.username) {
+      if (state.username && !state.accessToken) {
         await fetchUserAndRepos(state.username);
       }
     })();
     return () => { cancelled = true; };
   }, [syncFromSupabase, fetchUserAndRepos]);
+
+  // Poll for new pushes every 30s when page is visible (keeps plant healthy, graph updated)
+  useEffect(() => {
+    if (!username) return;
+    const poll = () => refreshEvents();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") {
+        poll(); // Immediate refresh when returning to tab
+      }
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") poll();
+    }, 30_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      clearInterval(id);
+    };
+  }, [username, refreshEvents]);
 
   const [inputUsername, setInputUsername] = useState(username || "");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -286,7 +320,16 @@ export default function GitHub() {
   const [repoToDelete, setRepoToDelete] = useState<GitHubRepo | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleConnect = () => {
+  const { linkGitHub } = useAuth();
+
+  const handleConnectWithGitHub = async () => {
+    const { error } = await linkGitHub(`${window.location.origin}/github`);
+    if (error) {
+      toast.error(error.message || "Failed to connect with GitHub");
+    }
+  };
+
+  const handleConnectWithUsername = () => {
     const trimmed = inputUsername.trim();
     if (trimmed) fetchUserAndRepos(trimmed);
   };
@@ -380,25 +423,39 @@ export default function GitHub() {
               <div>
                 <h3 className="font-semibold text-lg">Connect your GitHub</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Enter your username to see repos and track your coding activity
+                  One click to connect and see your repos and coding activity
                 </p>
               </div>
-              <div className="flex gap-2 max-w-sm mx-auto">
-                <Input
-                  placeholder="GitHub username"
-                  value={inputUsername}
-                  onChange={(e) => setInputUsername(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleConnect()}
-                  className="flex-1"
-                />
-                <Button onClick={handleConnect} disabled={isLoading}>
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    "Connect"
-                  )}
-                </Button>
-              </div>
+              <Button
+                size="lg"
+                className="w-full max-w-sm mx-auto"
+                onClick={handleConnectWithGitHub}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <Github className="w-4 h-4 mr-2" />
+                )}
+                Connect with GitHub
+              </Button>
+              <details className="text-left max-w-sm mx-auto">
+                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+                  Or connect with username only (read-only)
+                </summary>
+                <div className="flex gap-2 mt-2">
+                  <Input
+                    placeholder="GitHub username"
+                    value={inputUsername}
+                    onChange={(e) => setInputUsername(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleConnectWithUsername()}
+                    className="flex-1"
+                  />
+                  <Button variant="outline" onClick={handleConnectWithUsername} disabled={isLoading}>
+                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Connect"}
+                  </Button>
+                </div>
+              </details>
               {error && (
                 <div className="flex items-center gap-2 text-destructive text-sm">
                   <AlertCircle className="w-4 h-4" />

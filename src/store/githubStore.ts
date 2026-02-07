@@ -39,6 +39,8 @@ interface GitHubStore {
   setUsername: (username: string | null) => void;
   setAccessToken: (token: string | null) => void;
   fetchUserAndRepos: (username: string) => Promise<void>;
+  connectFromOAuthToken: (token: string) => Promise<void>;
+  refreshEvents: () => Promise<void>;
   createRepo: (name: string, description?: string, isPrivate?: boolean) => Promise<GitHubRepo | null>;
   deleteRepo: (fullName: string) => Promise<boolean>;
   disconnect: () => void | Promise<void>;
@@ -136,6 +138,145 @@ export const useGitHubStore = create<GitHubStore>()(
             isLoading: false,
             error: err instanceof Error ? err.message : "Something went wrong",
           });
+        }
+      },
+
+      connectFromOAuthToken: async (token: string) => {
+        set({ isLoading: true, error: null });
+        try {
+          const [userRes, reposRes, eventsRes] = await Promise.all([
+            fetch(`${GITHUB_API}/user`, {
+              headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+            }),
+            fetch(`${GITHUB_API}/user/repos?sort=updated&per_page=100`, {
+              headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+            }),
+            fetch(`${GITHUB_API}/user/events?per_page=100`, {
+              headers: { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json" },
+            }),
+          ]);
+
+          if (!userRes.ok) throw new Error("Failed to fetch GitHub data");
+
+          const [user, repos, events] = await Promise.all([
+            userRes.json(),
+            reposRes.json(),
+            eventsRes.json(),
+          ]);
+
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+          let pushesThisWeek = 0;
+          let lastPushDate: string | null = null;
+          const contributionMap: ContributionMap = {};
+
+          for (const event of events) {
+            if (event.type === "PushEvent") {
+              const eventDate = new Date(event.created_at);
+              const dateStr = eventDate.toISOString().split("T")[0];
+              const count = event.payload?.size ?? event.payload?.commits?.length ?? 1;
+              contributionMap[dateStr] = (contributionMap[dateStr] || 0) + count;
+              if (eventDate >= oneWeekAgo) {
+                pushesThisWeek++;
+              }
+              if (!lastPushDate || eventDate > new Date(lastPushDate)) {
+                lastPushDate = event.created_at;
+              }
+            }
+          }
+
+          set({
+            username: user.login,
+            user,
+            repos,
+            pushesThisWeek,
+            lastPushDate,
+            contributionMap,
+            accessToken: token,
+            isLoading: false,
+            error: null,
+          });
+
+          // Sync to Supabase Storage for cross-device
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+              const payload = { username: user.login, user, repos, pushesThisWeek, lastPushDate, contributionMap };
+              await supabase.storage
+                .from("avatars")
+                .upload(`${authUser.id}/github-sync.json`, JSON.stringify(payload), {
+                  contentType: "application/json",
+                  upsert: true,
+                });
+            }
+          } catch {
+            // Ignore storage errors
+          }
+        } catch (err) {
+          set({
+            isLoading: false,
+            error: err instanceof Error ? err.message : "Failed to connect GitHub",
+          });
+        }
+      },
+
+      refreshEvents: async () => {
+        const { username, accessToken } = get();
+        if (!username) return;
+        try {
+          const url = accessToken
+            ? `${GITHUB_API}/user/events?per_page=100`
+            : `${GITHUB_API}/users/${username}/events?per_page=100`;
+          const headers: HeadersInit = { Accept: "application/vnd.github+json" };
+          if (accessToken) (headers as Record<string, string>)["Authorization"] = `Bearer ${accessToken}`;
+
+          const eventsRes = await fetch(url, { headers });
+          if (!eventsRes.ok) return;
+
+          const events = await eventsRes.json();
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+          let pushesThisWeek = 0;
+          let lastPushDate: string | null = null;
+          const contributionMap: ContributionMap = {};
+
+          for (const event of events) {
+            if (event.type === "PushEvent") {
+              const eventDate = new Date(event.created_at);
+              const dateStr = eventDate.toISOString().split("T")[0];
+              const count = event.payload?.size ?? event.payload?.commits?.length ?? 1;
+              contributionMap[dateStr] = (contributionMap[dateStr] || 0) + count;
+              if (eventDate >= oneWeekAgo) pushesThisWeek++;
+              if (!lastPushDate || eventDate > new Date(lastPushDate)) lastPushDate = event.created_at;
+            }
+          }
+
+          set({ pushesThisWeek, lastPushDate, contributionMap });
+
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+              const s = get();
+              const payload = {
+                username: s.username,
+                user: s.user,
+                repos: s.repos,
+                pushesThisWeek,
+                lastPushDate,
+                contributionMap,
+              };
+              await supabase.storage.from("avatars").upload(`${authUser.id}/github-sync.json`, JSON.stringify(payload), {
+                contentType: "application/json",
+                upsert: true,
+              });
+            }
+          } catch {
+            // Ignore storage errors
+          }
+        } catch {
+          // Silent fail - don't disrupt UX
         }
       },
 
