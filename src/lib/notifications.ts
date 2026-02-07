@@ -5,6 +5,26 @@ let swRegistration: ServiceWorkerRegistration | null = null;
 
 const SCHEDULED_KEY = "focus-scheduled";
 const FOCUS_TIMER_NOTIFICATION_ID = 9001;
+const FOCUS_CHANNEL_ID = "focus-timer";
+
+/** Initialize native notifications (Android channel, etc.) - call on app load */
+export async function initNativeNotifications(): Promise<void> {
+  if (!Capacitor.isNativePlatform()) return;
+  try {
+    if (Capacitor.getPlatform() === "android") {
+      await LocalNotifications.createChannel({
+        id: FOCUS_CHANNEL_ID,
+        name: "Focus Timer",
+        description: "Notifications when focus sessions and breaks end",
+        importance: 5,
+        sound: "default",
+        vibration: true,
+      });
+    }
+  } catch (e) {
+    console.warn("Native notification init failed:", e);
+  }
+}
 
 function persistScheduled(endTime: number, title: string, body: string): void {
   if (Capacitor.isNativePlatform()) return;
@@ -33,8 +53,9 @@ export async function showNotificationNow(title: string, body: string): Promise<
             id: FOCUS_TIMER_NOTIFICATION_ID,
             title: t,
             body: b,
-            schedule: { at: new Date(Date.now() + 100) },
+            schedule: { at: new Date(Date.now() + 100), allowWhileIdle: true },
             sound: "default",
+            channelId: FOCUS_CHANNEL_ID,
           },
         ],
       });
@@ -100,8 +121,9 @@ export async function scheduleTimerNotificationViaSW(
             id: FOCUS_TIMER_NOTIFICATION_ID,
             title: title || "Focus session complete!",
             body: body || "Great work! Time for a break.",
-            schedule: { at: new Date(endTime) },
+            schedule: { at: new Date(endTime), allowWhileIdle: true },
             sound: "default",
+            channelId: FOCUS_CHANNEL_ID,
           },
         ],
       });
@@ -117,9 +139,12 @@ export async function scheduleTimerNotificationViaSW(
     for (let i = 0; i < retries; i++) {
       try {
         const reg = swRegistration ?? (await navigator.serviceWorker.ready);
-        if (reg?.active) {
-          reg.active.postMessage({ type: "SCHEDULE_TIMER_END", endTime, title, body });
-          return;
+        if (reg) {
+          swRegistration = reg;
+          if (reg.active) {
+            reg.active.postMessage({ type: "SCHEDULE_TIMER_END", endTime, title, body });
+            return;
+          }
         }
       } catch (e) {
         console.warn("SW postMessage attempt failed:", e);

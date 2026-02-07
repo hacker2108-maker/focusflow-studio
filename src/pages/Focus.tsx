@@ -59,6 +59,7 @@ export default function Focus() {
       if (remaining <= 0 && !hasHandledCompletionRef.current) {
         hasHandledCompletionRef.current = true;
         clearScheduledNotification();
+        cancelTimerNotificationViaSW(); // Prevent duplicate when completing in foreground
         if (timer.phase === "work") {
           setShowCompleteDialog(true);
           alarmSound.playAlarm(preset.alarmSound);
@@ -78,11 +79,11 @@ export default function Focus() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   useEffect(() => {
-    const checkPermission = async () => {
-      const granted = await requestNotificationPermission();
-      setNotificationsEnabled(granted);
-      if (granted) {
-        toast.success("Notifications enabled! Keep the app in the background to get notified when the timer ends.", { duration: 4000 });
+    // Check permission without requesting (avoids blocked prompt on page load)
+    const checkPermission = () => {
+      if ("Notification" in window) {
+        const granted = Notification.permission === "granted";
+        setNotificationsEnabled(granted);
       }
     };
     checkPermission();

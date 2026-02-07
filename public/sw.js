@@ -5,6 +5,10 @@ const NOTIFICATION_TAG = "focus-timer-end";
 let pendingTimeoutId = null;
 let pendingResolve = null;
 
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
