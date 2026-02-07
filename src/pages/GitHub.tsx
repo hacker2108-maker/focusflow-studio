@@ -48,6 +48,7 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useGitHubStore, type GitHubRepo } from "@/store/githubStore";
+import { ContributionTree } from "@/components/github/ContributionTree";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
 import { Switch } from "@/components/ui/switch";
@@ -190,59 +191,6 @@ function ContributionGraph({ contributionMap }: { contributionMap: Record<string
   );
 }
 
-function ContributionPlant({ pushesThisWeek }: { pushesThisWeek: number }) {
-  const isThriving = pushesThisWeek > 0;
-  const healthLevel = Math.min(pushesThisWeek, 5);
-
-  return (
-    <div className="relative flex flex-col items-center justify-end min-h-[160px]">
-      <div className="w-20 h-14 rounded-b-2xl border-4 border-foreground/20 bg-gradient-to-b from-foreground/10 to-foreground/5" />
-      <motion.div
-        className={cn(
-          "w-2 rounded-full origin-bottom",
-          isThriving ? "bg-emerald-600" : "bg-amber-800/60"
-        )}
-        animate={{ height: isThriving ? 60 + healthLevel * 12 : 32 }}
-        transition={{ type: "spring", stiffness: 200, damping: 20 }}
-      />
-      <div className="flex gap-2 -mt-1">
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            className={cn(
-              "rounded-full",
-              isThriving ? "bg-emerald-500" : "bg-amber-700/50"
-            )}
-            animate={{
-              scale: isThriving ? 1 : 0.6,
-              width: isThriving ? 20 : 16,
-              height: isThriving ? 14 : 10,
-            }}
-          />
-        ))}
-      </div>
-      <motion.div
-        className={cn(
-          "mt-2 rounded-full flex items-center justify-center",
-          isThriving ? "bg-emerald-400 shadow-lg shadow-emerald-500/30" : "bg-amber-600/70"
-        )}
-        animate={{ scale: isThriving ? 1.1 : 0.8 }}
-        style={{ width: 40, height: 40 }}
-      >
-        {isThriving ? (
-          <span className="text-xl">🌱</span>
-        ) : (
-          <span className="text-xl opacity-80">🥀</span>
-        )}
-      </motion.div>
-      {!isThriving && (
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-32 bg-amber-900/15 rounded-full blur-2xl animate-pulse" />
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default function GitHub() {
   const navigate = useNavigate();
@@ -479,7 +427,7 @@ export default function GitHub() {
             <CardContent className="p-6">
               <div className="flex flex-col md:flex-row items-center gap-6">
                 <div className="flex-1">
-                  <ContributionPlant pushesThisWeek={pushesThisWeek} />
+                  <ContributionTree pushesThisWeek={pushesThisWeek} />
                 </div>
                 <div className="flex-1 text-center md:text-left space-y-2">
                   <AnimatePresence mode="wait">
