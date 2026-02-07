@@ -41,6 +41,7 @@ interface GitHubStore {
   fetchUserAndRepos: (username: string) => Promise<void>;
   connectFromOAuthToken: (token: string) => Promise<void>;
   refreshEvents: () => Promise<void>;
+  refreshFromCommits: () => Promise<void>;
   createRepo: (name: string, description?: string, isPrivate?: boolean) => Promise<GitHubRepo | null>;
   deleteRepo: (fullName: string) => Promise<boolean>;
   disconnect: () => void | Promise<void>;
@@ -277,6 +278,76 @@ export const useGitHubStore = create<GitHubStore>()(
           }
         } catch {
           // Silent fail - don't disrupt UX
+        }
+      },
+
+      // Commits API is real-time (Events API has 30s–6h delay). Use when we have repos.
+      refreshFromCommits: async () => {
+        const { username, repos, accessToken } = get();
+        if (!username || !repos.length) return;
+        try {
+          const since = new Date();
+          since.setDate(since.getDate() - 14 * 7);
+          const sinceISO = since.toISOString();
+          const headers: HeadersInit = { Accept: "application/vnd.github+json" };
+          if (accessToken) (headers as Record<string, string>)["Authorization"] = `Bearer ${accessToken}`;
+
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+          const contributionMap: ContributionMap = {};
+          let lastPushDate: string | null = null;
+          let pushesThisWeek = 0;
+
+          const reposToFetch = repos.slice(0, 20);
+          const results = await Promise.all(
+            reposToFetch.map((repo) =>
+              fetch(
+                `${GITHUB_API}/repos/${repo.full_name}/commits?since=${sinceISO}&author=${username}&per_page=100`,
+                { headers }
+              )
+            )
+          );
+
+          for (const res of results) {
+            if (!res.ok) continue;
+            const commits = await res.json();
+            for (const c of commits) {
+              const commit = c.commit;
+              const date = commit?.author?.date || commit?.committer?.date;
+              if (!date) continue;
+              const eventDate = new Date(date);
+              const dateStr = eventDate.toISOString().split("T")[0];
+              contributionMap[dateStr] = (contributionMap[dateStr] || 0) + 1;
+              if (eventDate >= oneWeekAgo) pushesThisWeek++;
+              if (!lastPushDate || eventDate > new Date(lastPushDate)) lastPushDate = date;
+            }
+          }
+
+          set({ pushesThisWeek, lastPushDate, contributionMap });
+
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+              const s = get();
+              const payload = {
+                username: s.username,
+                user: s.user,
+                repos: s.repos,
+                pushesThisWeek,
+                lastPushDate,
+                contributionMap,
+              };
+              await supabase.storage.from("avatars").upload(`${authUser.id}/github-sync.json`, JSON.stringify(payload), {
+                contentType: "application/json",
+                upsert: true,
+              });
+            }
+          } catch {
+            // Ignore storage errors
+          }
+        } catch {
+          // Silent fail
         }
       },
 

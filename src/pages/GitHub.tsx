@@ -261,6 +261,7 @@ export default function GitHub() {
     syncFromSupabase,
     connectFromOAuthToken,
     refreshEvents,
+    refreshFromCommits,
     createRepo,
     deleteRepo,
     disconnect,
@@ -291,24 +292,29 @@ export default function GitHub() {
     return () => { cancelled = true; };
   }, [syncFromSupabase, fetchUserAndRepos]);
 
-  // Poll for new pushes every 30s when page is visible (keeps plant healthy, graph updated)
+  // Poll for new pushes. Commits API = real-time; Events API = 30s–6h delay.
   useEffect(() => {
     if (!username) return;
-    const poll = () => refreshEvents();
-    const onVisible = () => {
-      if (document.visibilityState === "visible") {
-        poll(); // Immediate refresh when returning to tab
+    const poll = () => {
+      if (document.visibilityState !== "visible") return;
+      const state = useGitHubStore.getState();
+      if (state.repos.length > 0) {
+        refreshFromCommits();
+      } else {
+        refreshEvents();
       }
     };
-    document.addEventListener("visibilitychange", onVisible);
-    const id = setInterval(() => {
+    const onVisible = () => {
       if (document.visibilityState === "visible") poll();
-    }, 30_000);
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    poll(); // Immediate refresh on mount and when returning to tab
+    const id = setInterval(poll, 15_000);
     return () => {
       document.removeEventListener("visibilitychange", onVisible);
       clearInterval(id);
     };
-  }, [username, refreshEvents]);
+  }, [username, refreshEvents, refreshFromCommits]);
 
   const [inputUsername, setInputUsername] = useState(username || "");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -532,11 +538,14 @@ export default function GitHub() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => fetchUserAndRepos(username)}
+                      onClick={() => {
+                        if (repos.length > 0) refreshFromCommits();
+                        else fetchUserAndRepos(username);
+                      }}
                       disabled={isLoading}
                     >
                       <RefreshCw className={cn("w-4 h-4 mr-1", isLoading && "animate-spin")} />
-                      Refresh
+                      Just pushed? Refresh
                     </Button>
                     <Button variant="ghost" size="sm" onClick={disconnect}>
                       <Unplug className="w-4 h-4 mr-1" />
