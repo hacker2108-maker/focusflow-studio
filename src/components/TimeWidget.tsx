@@ -49,7 +49,7 @@ export function TimeWidget({ compact = false }: TimeWidgetProps) {
         <Clock className="w-6 h-6 text-primary-foreground" />
       </div>
       <div>
-        <p className="text-2xl font-bold tracking-tight">{formatTime(time)}</p>
+        <p className="font-mono text-2xl font-bold tracking-tight tabular-nums">{formatTime(time)}</p>
         <p className="text-sm text-muted-foreground">{formatDate(time)}</p>
       </div>
     </div>

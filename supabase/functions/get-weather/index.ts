@@ -17,12 +17,16 @@ serve(async (req) => {
     
     // Use Open-Meteo free API (no API key required!)
     if (lat && lon) {
-      weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+      weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
     } else if (city) {
-      // First geocode the city
+      // Geocode and fetch weather in parallel where possible - use timeout for faster fail
+      const geoController = new AbortController();
+      const geoTimeout = setTimeout(() => geoController.abort(), 5000);
       const geoResponse = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1`
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(city)}&count=1&language=en`,
+        { signal: geoController.signal }
       );
+      clearTimeout(geoTimeout);
       const geoData = await geoResponse.json();
       
       if (!geoData.results || geoData.results.length === 0) {
@@ -33,7 +37,7 @@ serve(async (req) => {
       }
       
       const { latitude, longitude, name, country } = geoData.results[0];
-      weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto`;
+      weatherUrl = `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&daily=weather_code,temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=5`;
     } else {
       return new Response(JSON.stringify({ error: "Location required" }), {
         status: 400,
