@@ -1,5 +1,5 @@
 // Audio utility for playing alarm sounds
-export type AlarmSoundType = "chime" | "bell" | "gentle" | "melody" | "none";
+export type AlarmSoundType = "chime" | "bell" | "gentle" | "melody" | "song" | "none";
 
 export class AlarmSound {
   private audioContext: AudioContext | null = null;
@@ -26,6 +26,9 @@ export class AlarmSound {
         break;
       case "melody":
         this.playMelody();
+        break;
+      case "song":
+        this.playSong();
         break;
     }
   }
@@ -152,6 +155,40 @@ export class AlarmSound {
     oscillator.stop(now + 2);
   }
 
+  /** Longer celebration song - plays when focus session completes */
+  private playSong(): void {
+    const ctx = this.getAudioContext();
+    const now = ctx.currentTime;
+    // Uplifting completion melody - C major scale celebration
+    const notes = [
+      { freq: 523.25, time: 0, duration: 0.35 },     // C5
+      { freq: 659.25, time: 0.35, duration: 0.35 },   // E5
+      { freq: 783.99, time: 0.7, duration: 0.4 },    // G5
+      { freq: 1046.50, time: 1.1, duration: 0.6 },   // C6
+      { freq: 987.77, time: 1.8, duration: 0.3 },    // B5
+      { freq: 783.99, time: 2.15, duration: 0.35 },  // G5
+      { freq: 659.25, time: 2.55, duration: 0.4 },   // E5
+      { freq: 523.25, time: 3.0, duration: 0.5 },   // C5
+      { freq: 698.46, time: 3.6, duration: 0.4 },    // F5
+      { freq: 783.99, time: 4.05, duration: 0.45 },  // G5
+      { freq: 1046.50, time: 4.55, duration: 0.7 },  // C6 (resolve)
+    ];
+    notes.forEach(({ freq, time, duration }) => {
+      const oscillator = ctx.createOscillator();
+      const gainNode = ctx.createGain();
+      oscillator.connect(gainNode);
+      gainNode.connect(ctx.destination);
+      oscillator.type = 'triangle';
+      oscillator.frequency.setValueAtTime(freq, now + time);
+      gainNode.gain.setValueAtTime(0, now + time);
+      gainNode.gain.linearRampToValueAtTime(0.28, now + time + 0.04);
+      gainNode.gain.setValueAtTime(0.28, now + time + duration * 0.6);
+      gainNode.gain.exponentialRampToValueAtTime(0.01, now + time + duration);
+      oscillator.start(now + time);
+      oscillator.stop(now + time + duration + 0.1);
+    });
+  }
+
   private playMelody(): void {
     const ctx = this.getAudioContext();
     const now = ctx.currentTime;
@@ -218,6 +255,10 @@ export class AlarmSound {
 
   playBreakEnd(type: AlarmSoundType = "chime"): void {
     if (type === "none") return;
+    if (type === "song") {
+      this.playMelody(); // Shorter version for break end
+      return;
+    }
     
     const ctx = this.getAudioContext();
     const now = ctx.currentTime;
@@ -263,6 +304,7 @@ export class AlarmSound {
         freq = 392;
         break;
       case "melody":
+      case "song":
         // Play a short melody preview
         const previewNotes = [
           { freq: 523.25, time: 0 },

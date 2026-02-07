@@ -1,11 +1,15 @@
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { Capacitor } from "@capacitor/core";
 
-/** Register service worker for background notifications when tab is closed */
+let swRegistration: ServiceWorkerRegistration | null = null;
+
+/** Register service worker early - required for PWA notifications when app is background/closed */
 export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (!("serviceWorker" in navigator) || Capacitor.isNativePlatform()) return null;
   try {
     const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    swRegistration = reg;
+    await navigator.serviceWorker.ready;
     return reg;
   } catch (e) {
     console.warn("Service worker registration failed:", e);
@@ -13,7 +17,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   }
 }
 
-/** Schedule timer notification via service worker - works when tab is closed/minimized */
+/** Schedule timer notification via service worker - works when tab is closed/minimized (PWA) */
 export async function scheduleTimerNotificationViaSW(
   endTime: number,
   title: string,
@@ -21,15 +25,28 @@ export async function scheduleTimerNotificationViaSW(
 ): Promise<void> {
   if (Capacitor.isNativePlatform()) return;
   try {
-    const reg = await navigator.serviceWorker?.ready;
-    reg?.active?.postMessage({
-      type: "SCHEDULE_TIMER_END",
-      endTime,
-      title,
-      body,
-    });
+    const reg = swRegistration ?? await navigator.serviceWorker.ready;
+    if (reg?.active) {
+      reg.active.postMessage({
+        type: "SCHEDULE_TIMER_END",
+        endTime,
+        title,
+        body,
+      });
+    }
   } catch {
     // Silently fail - main page will show notification when tab is open
+  }
+}
+
+/** Cancel scheduled timer notification when user pauses or resets */
+export async function cancelTimerNotificationViaSW(): Promise<void> {
+  if (Capacitor.isNativePlatform()) return;
+  try {
+    const reg = swRegistration ?? await navigator.serviceWorker.ready;
+    reg?.active?.postMessage({ type: "CANCEL_TIMER_END" });
+  } catch {
+    // Silently fail
   }
 }
 

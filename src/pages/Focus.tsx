@@ -1,10 +1,11 @@
 import { useEffect, useState, useMemo, useRef } from "react";
-import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2, Settings, Volume2, VolumeX, Minus, Plus, Bell } from "lucide-react";
+import { Play, Pause, RotateCcw, Coffee, Brain, CheckCircle2, Settings, Volume2, VolumeX, Minus, Plus, Bell, Smartphone } from "lucide-react";
 import { useFocusStore } from "@/store/focusStore";
+import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useHabitStore } from "@/store/habitStore";
 import { formatTime, getToday, isHabitDueToday } from "@/lib/utils";
 import { alarmSound, AlarmSoundType } from "@/lib/audio";
-import { requestNotificationPermission, scheduleNotification, scheduleTimerNotificationViaSW } from "@/lib/notifications";
+import { requestNotificationPermission, scheduleTimerNotificationViaSW, cancelTimerNotificationViaSW } from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -60,17 +61,10 @@ export default function Focus() {
         if (timer.phase === "work") {
           setShowCompleteDialog(true);
           alarmSound.playAlarm(preset.alarmSound);
-          // Notification shown via service worker (scheduled at timer start)
-          scheduleNotification(Date.now(), "Focus session complete!", timer.task || "Great work! Time for a break.", new Date());
+          // Notification shown via service worker (scheduled at timer start) - works when app is background/closed
         } else {
           alarmSound.playBreakEnd(preset.alarmSound);
           toast.success("Break complete! Ready for the next session?");
-          scheduleNotification(
-            Date.now(),
-            "Break is over! ☕",
-            "Ready for the next focus session?",
-            new Date()
-          );
           completeSession();
         }
       }
@@ -123,6 +117,13 @@ export default function Focus() {
     }
   }, [timer.isRunning, timer.isPaused, timer.startTimestamp, timer.phase, timer.totalDuration, timer.task]);
 
+  // Cancel scheduled notification when pausing or resetting
+  useEffect(() => {
+    if (!timer.isRunning || timer.isPaused) {
+      cancelTimerNotificationViaSW();
+    }
+  }, [timer.isRunning, timer.isPaused]);
+
   const handleComplete = (markHabits: string[] = []) => {
     completeSession();
     setShowCompleteDialog(false);
@@ -142,6 +143,9 @@ export default function Focus() {
 
   const phaseLabel = timer.phase === "work" ? "Focus" : timer.phase === "break" ? "Break" : "Long Break";
   const isWorkPhase = timer.phase === "work";
+
+  // Keep screen on during active focus sessions (mobile PWA)
+  useScreenWakeLock(timer.isRunning && !timer.isPaused);
 
   return (
     <div className="relative min-h-[calc(100vh-8rem)] -mx-4 -mt-4 px-4 pt-4 pb-32 overflow-hidden">
@@ -307,6 +311,15 @@ export default function Focus() {
             )}
           </CardContent>
         </Card>
+
+        {timer.isRunning && !timer.isPaused && (
+          <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border/50 text-sm text-muted-foreground">
+            <Smartphone className="w-4 h-4 shrink-0 text-primary" />
+            <span>
+              <strong className="text-foreground">Focus mode:</strong> Enable Do Not Disturb on your device to block other app notifications and messages.
+            </span>
+          </div>
+        )}
 
         {mode === "pomodoro" ? (
           <div className="grid grid-cols-3 gap-3">
@@ -497,6 +510,7 @@ function FocusSettingsDialog({
               <SelectItem value="bell"><div className="flex items-center gap-2"><Volume2 className="w-4 h-4" />Bell</div></SelectItem>
               <SelectItem value="gentle"><div className="flex items-center gap-2"><Volume2 className="w-4 h-4" />Gentle</div></SelectItem>
               <SelectItem value="melody"><div className="flex items-center gap-2"><Bell className="w-4 h-4" />Melody</div></SelectItem>
+              <SelectItem value="song"><div className="flex items-center gap-2"><Bell className="w-4 h-4" />Song (celebration)</div></SelectItem>
               <SelectItem value="none"><div className="flex items-center gap-2"><VolumeX className="w-4 h-4" />None</div></SelectItem>
             </SelectContent>
           </Select>

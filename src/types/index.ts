@@ -61,7 +61,7 @@ export interface FocusPreset {
   deepFocusMinutes: number;
   autoStartBreaks: boolean;
   autoStartWork: boolean;
-  alarmSound: "chime" | "bell" | "gentle" | "none";
+  alarmSound: "chime" | "bell" | "gentle" | "melody" | "song" | "none";
 }
 
 // Insights Types
