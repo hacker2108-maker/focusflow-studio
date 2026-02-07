@@ -556,7 +556,7 @@ export default function GitHub() {
                   )}
                 </div>
               ) : (
-                repos.slice(0, 30).map((repo) => (
+                repos.map((repo) => (
                   <motion.div
                     key={repo.id}
                     initial={{ opacity: 0, y: 5 }}

@@ -66,7 +66,7 @@ export const useGitHubStore = create<GitHubStore>()(
         try {
           const [userRes, reposRes, eventsRes] = await Promise.all([
             fetch(`${GITHUB_API}/users/${username}`),
-            fetch(`${GITHUB_API}/users/${username}/repos?sort=updated&per_page=30`),
+            fetch(`${GITHUB_API}/users/${username}/repos?sort=updated&per_page=100`),
             fetch(`${GITHUB_API}/users/${username}/events?per_page=100`),
           ]);
 
