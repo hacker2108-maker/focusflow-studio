@@ -62,10 +62,10 @@ export default function Focus() {
         if (timer.phase === "work") {
           setShowCompleteDialog(true);
           alarmSound.playAlarm(preset.alarmSound);
-          showNotificationNow("Focus session complete!", timer.task || "Great work! Time for a break.");
+          void showNotificationNow("Focus session complete!", timer.task || "Great work! Time for a break.");
         } else {
           alarmSound.playBreakEnd(preset.alarmSound);
-          showNotificationNow("Break is over! ☕", "Ready for the next focus session?");
+          void showNotificationNow("Break is over! ☕", "Ready for the next focus session?");
           toast.success("Break complete! Ready for the next session?");
           completeSession();
         }
@@ -92,7 +92,11 @@ export default function Focus() {
     ? (1 - timeRemaining / timer.totalDuration) * 100
     : 0;
 
-  const handleStart = () => {
+  const handleStart = async () => {
+    const granted = await requestNotificationPermission();
+    if (!granted) {
+      toast.info("Enable notifications in Settings to get notified when the timer ends.", { duration: 4000 });
+    }
     alarmSound.warmUp();
     const duration = mode === "pomodoro" ? preset.workMinutes * 60 : preset.deepFocusMinutes * 60;
     startTimer(mode, task.trim() || undefined, duration);

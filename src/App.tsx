@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
-import { registerServiceWorker } from "@/lib/notifications";
+import { registerServiceWorker, checkAndShowMissedNotification } from "@/lib/notifications";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -34,7 +34,13 @@ const queryClient = new QueryClient({
 
 const App = () => {
   useEffect(() => {
-    registerServiceWorker();
+    checkAndShowMissedNotification();
+  }, []);
+
+  useEffect(() => {
+    const onVisible = () => checkAndShowMissedNotification();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
   }, []);
 
   return (

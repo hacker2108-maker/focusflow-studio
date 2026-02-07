@@ -9,6 +9,24 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
 });
 
+// Use chunked timeouts (max 1 min) - long timeouts get throttled/killed on mobile
+function scheduleChunked(endTime, title, body, resolve) {
+  const delay = Math.max(0, endTime - Date.now());
+  const chunk = Math.min(delay, 60000);
+  if (chunk <= 0) {
+    showFocusNotification(title, body).then(resolve).catch(resolve);
+    return;
+  }
+  pendingTimeoutId = setTimeout(() => {
+    pendingTimeoutId = null;
+    if (Date.now() >= endTime) {
+      showFocusNotification(title, body).then(resolve).catch(resolve);
+    } else {
+      scheduleChunked(endTime, title, body, resolve);
+    }
+  }, chunk);
+}
+
 self.addEventListener("message", (event) => {
   if (event.data?.type === "SCHEDULE_TIMER_END") {
     if (pendingTimeoutId) {
@@ -28,11 +46,7 @@ self.addEventListener("message", (event) => {
         showFocusNotification(title, body).then(resolve).catch(resolve);
       } else {
         pendingResolve = resolve;
-        pendingTimeoutId = setTimeout(() => {
-          pendingTimeoutId = null;
-          pendingResolve = null;
-          showFocusNotification(title, body).then(resolve).catch(resolve);
-        }, delay);
+        scheduleChunked(endTime, title, body, resolve);
       }
     });
 

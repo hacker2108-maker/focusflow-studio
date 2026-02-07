@@ -134,6 +134,20 @@ export default {
           "0%, 100%": { transform: "translateY(0)" },
           "50%": { transform: "translateY(-10px)" },
         },
+        "breeze-sway": {
+          "0%, 100%": { transform: "rotate(-1deg)" },
+          "50%": { transform: "rotate(1deg)" },
+        },
+        "breeze-sway-strong": {
+          "0%, 100%": { transform: "rotate(-2deg)" },
+          "50%": { transform: "rotate(2deg)" },
+        },
+        "bird-fly": {
+          "0%": { transform: "translateX(-120%) translateY(0) scaleX(1)" },
+          "50%": { transform: "translateX(50%) translateY(-8px) scaleX(1)" },
+          "51%": { transform: "translateX(50%) translateY(-8px) scaleX(-1)" },
+          "100%": { transform: "translateX(220%) translateY(2px) scaleX(-1)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -146,6 +160,9 @@ export default {
         shimmer: "shimmer 2s linear infinite",
         "pulse-ring": "pulse-ring 2s ease-in-out infinite",
         float: "float 6s ease-in-out infinite",
+        "breeze-sway": "breeze-sway 4s ease-in-out infinite",
+        "breeze-sway-strong": "breeze-sway-strong 3s ease-in-out infinite",
+        "bird-fly": "bird-fly 12s ease-in-out infinite",
       },
       transitionTimingFunction: {
         spring: "cubic-bezier(0.16, 1, 0.3, 1)",
