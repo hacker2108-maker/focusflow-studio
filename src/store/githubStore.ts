@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
+import { supabase } from "@/integrations/supabase/client";
 
 export interface GitHubRepo {
   id: number;
@@ -40,7 +41,8 @@ interface GitHubStore {
   fetchUserAndRepos: (username: string) => Promise<void>;
   createRepo: (name: string, description?: string, isPrivate?: boolean) => Promise<GitHubRepo | null>;
   deleteRepo: (fullName: string) => Promise<boolean>;
-  disconnect: () => void;
+  disconnect: () => void | Promise<void>;
+  syncFromSupabase: () => Promise<void>;
 }
 
 const GITHUB_API = "https://api.github.com";
@@ -113,11 +115,58 @@ export const useGitHubStore = create<GitHubStore>()(
             isLoading: false,
             error: null,
           });
+
+          // Sync to Supabase Storage for cross-device (phone/laptop) - uses existing avatars bucket
+          try {
+            const { data: { user: authUser } } = await supabase.auth.getUser();
+            if (authUser) {
+              const payload = { username, user, repos, pushesThisWeek, lastPushDate, contributionMap };
+              await supabase.storage
+                .from("avatars")
+                .upload(`${authUser.id}/github-sync.json`, JSON.stringify(payload), {
+                  contentType: "application/json",
+                  upsert: true,
+                });
+            }
+          } catch {
+            // Ignore storage errors - app works with localStorage fallback
+          }
         } catch (err) {
           set({
             isLoading: false,
             error: err instanceof Error ? err.message : "Something went wrong",
           });
+        }
+      },
+
+      syncFromSupabase: async () => {
+        try {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (!authUser) return;
+          const { data: blob, error } = await supabase.storage
+            .from("avatars")
+            .download(`${authUser.id}/github-sync.json`);
+          if (!error && blob) {
+            const text = await blob.text();
+            const parsed = JSON.parse(text) as {
+              username: string;
+              user: GitHubUser;
+              repos: GitHubRepo[];
+              pushesThisWeek: number;
+              lastPushDate: string | null;
+              contributionMap: ContributionMap;
+            };
+            set({
+              username: parsed.username,
+              user: parsed.user ?? null,
+              repos: parsed.repos ?? [],
+              pushesThisWeek: parsed.pushesThisWeek ?? 0,
+              lastPushDate: parsed.lastPushDate,
+              contributionMap: parsed.contributionMap ?? {},
+            });
+          }
+        } catch {
+          // Ignore - use localStorage fallback
         }
       },
 
@@ -159,7 +208,7 @@ export const useGitHubStore = create<GitHubStore>()(
         }
       },
 
-      disconnect: () =>
+      disconnect: async () => {
         set({
           username: null,
           user: null,
@@ -168,7 +217,16 @@ export const useGitHubStore = create<GitHubStore>()(
           lastPushDate: null,
           contributionMap: {},
           error: null,
-        }),
+        });
+        try {
+          const { data: { user: authUser } } = await supabase.auth.getUser();
+          if (authUser) {
+            await supabase.storage.from("avatars").remove([`${authUser.id}/github-sync.json`]);
+          }
+        } catch {
+          // Ignore
+        }
+      },
     }),
     { name: "focusflow-github" }
   )

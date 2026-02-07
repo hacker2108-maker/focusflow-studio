@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -256,10 +256,25 @@ export default function GitHub() {
     error,
     accessToken,
     fetchUserAndRepos,
+    syncFromSupabase,
     createRepo,
     deleteRepo,
     disconnect,
   } = useGitHubStore();
+
+  // Sync from Supabase on mount (cross-device: laptop → phone) and refetch fresh data
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await syncFromSupabase();
+      if (cancelled) return;
+      const state = useGitHubStore.getState();
+      if (state.username) {
+        await fetchUserAndRepos(state.username);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [syncFromSupabase, fetchUserAndRepos]);
 
   const [inputUsername, setInputUsername] = useState(username || "");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
