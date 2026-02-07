@@ -52,19 +52,36 @@ npm run dev
 
 ## GitHub OAuth Setup (one-time)
 
-For the "Connect with GitHub" button to work, configure GitHub in your Supabase project:
+Your credentials:
+- **Client ID:** `Ov23ctH4svbBvROTxUx7`
+- **Client Secret:** `25da40c680d8e49e0617ebb5792bc4b6ebd27554`
+- **Callback URL:** `https://bimifcjflwuekavtswvc.supabase.co/auth/v1/callback`
 
-1. **Supabase Dashboard** → [Authentication](https://supabase.com/dashboard/project/bimifcjflwuekavtswvc/auth/providers) → **Providers** → **GitHub**
+### If using Lovable Cloud (no Supabase access)
+
+1. In Lovable, click the **Cloud** tab (the + icon next to Preview).
+2. Go to **Users → Auth**.
+3. Look for **GitHub** – if it exists, enable it and enter:
+   - Client ID: `Ov23ctH4svbBvROTxUx7`
+   - Client Secret: `25da40c680d8e49e0617ebb5792bc4b6ebd27554`
+4. In your GitHub OAuth App settings, add the callback URL above.
+5. If **GitHub is not listed**, try prompting Lovable: *"Add GitHub OAuth login with client ID Ov23ctH4svbBvROTxUx7"* – or contact Lovable support for GitHub auth in Cloud. **Alternative:** Connect your own Supabase project in Lovable (Project Settings → Integrations → Connect Supabase) to get full control over auth providers.
+
+### If using your own Supabase project
+
+1. **Supabase Dashboard** → Authentication → Providers → **GitHub**
    - Enable GitHub
    - Client ID: `Ov23ctH4svbBvROTxUx7`
-   - Client Secret: (your GitHub OAuth app secret)
+   - Client Secret: `25da40c680d8e49e0617ebb5792bc4b6ebd27554`
    - Save
 
-2. **General Auth** → Enable **"Allow manual linking"** (for linking GitHub to existing accounts)
+2. **GitHub OAuth App** → Add callback URL: `https://bimifcjflwuekavtswvc.supabase.co/auth/v1/callback`
 
-3. **GitHub OAuth App** → Add callback URL: `https://bimifcjflwuekavtswvc.supabase.co/auth/v1/callback`
+3. **Redirect URLs** in Supabase → Add your app URL (e.g. `https://your-app.lovable.app/*`)
 
-4. **Redirect URLs** in Supabase → Add your app URL (e.g. `https://your-app.lovable.app/*`)
+### Private repos
+
+The app requests the `repo` scope for private repo access. If you connected before this was added, disconnect and reconnect to grant access.
 
 ## What technologies are used for this project?
 

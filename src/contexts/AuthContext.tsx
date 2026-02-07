@@ -68,16 +68,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       provider: "github",
       options: {
         redirectTo: redirectTo || `${window.location.origin}/`,
+        scopes: "repo", // Required for private repo access (commits, events)
       },
     });
     return { error };
   };
 
   const linkGitHub = async (redirectTo?: string) => {
-    const { error } = await supabase.auth.linkIdentity({
+    // Use signInWithOAuth instead of linkIdentity (works without manual linking; auto-links when emails match)
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "github",
       options: {
         redirectTo: redirectTo || `${window.location.origin}/github`,
+        scopes: "repo", // Required for private repo access (commits, events)
       },
     });
     return { error };

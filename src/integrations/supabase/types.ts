@@ -468,6 +468,45 @@ export type Database = {
         }
         Relationships: []
       }
+      github_connections: {
+        Row: {
+          id: string
+          user_id: string
+          username: string
+          user_data: Json | null
+          repos: Json
+          pushes_this_week: number
+          last_push_date: string | null
+          contribution_map: Json
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          username: string
+          user_data?: Json | null
+          repos?: Json
+          pushes_this_week?: number
+          last_push_date?: string | null
+          contribution_map?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          username?: string
+          user_data?: Json | null
+          repos?: Json
+          pushes_this_week?: number
+          last_push_date?: string | null
+          contribution_map?: Json
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       workout_sessions: {
         Row: {
           completed_at: string | null

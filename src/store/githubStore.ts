@@ -13,6 +13,7 @@ export interface GitHubRepo {
   language: string | null;
   updated_at: string;
   private: boolean;
+  default_branch?: string;
 }
 
 export interface GitHubUser {
@@ -299,6 +300,24 @@ export const useGitHubStore = create<GitHubStore>()(
           const contributionMap: ContributionMap = {};
           let lastPushDate: string | null = null;
           let pushesThisWeek = 0;
+          const seenShas = new Set<string>();
+
+          const addCommits = (commits: unknown[]) => {
+            if (!Array.isArray(commits)) return;
+            for (const c of commits) {
+              const co = c as { sha?: string; commit?: { author?: { date?: string }; committer?: { date?: string } } };
+              if (co.sha && seenShas.has(co.sha)) continue;
+              if (co.sha) seenShas.add(co.sha);
+              const commit = co.commit;
+              const date = commit?.author?.date || commit?.committer?.date;
+              if (!date) continue;
+              const eventDate = new Date(date);
+              const dateStr = eventDate.toISOString().split("T")[0];
+              contributionMap[dateStr] = (contributionMap[dateStr] || 0) + 1;
+              if (eventDate >= oneWeekAgo) pushesThisWeek++;
+              if (!lastPushDate || eventDate > new Date(lastPushDate)) lastPushDate = date;
+            }
+          };
 
           const reposToFetch = repos.slice(0, 20);
           const results = await Promise.all(
@@ -313,16 +332,28 @@ export const useGitHubStore = create<GitHubStore>()(
           for (const res of results) {
             if (!res.ok) continue;
             const commits = await res.json();
-            if (!Array.isArray(commits)) continue;
-            for (const c of commits) {
-              const commit = c.commit;
-              const date = commit?.author?.date || commit?.committer?.date;
-              if (!date) continue;
-              const eventDate = new Date(date);
-              const dateStr = eventDate.toISOString().split("T")[0];
-              contributionMap[dateStr] = (contributionMap[dateStr] || 0) + 1;
-              if (eventDate >= oneWeekAgo) pushesThisWeek++;
-              if (!lastPushDate || eventDate > new Date(lastPushDate)) lastPushDate = date;
+            addCommits(commits);
+          }
+
+          if (accessToken) {
+            const topRepos = repos.slice(0, 5);
+            for (const repo of topRepos) {
+              const branchesRes = await fetch(`${GITHUB_API}/repos/${repo.full_name}/branches?per_page=5`, { headers });
+              if (!branchesRes.ok) continue;
+              const branches = await branchesRes.json();
+              if (!Array.isArray(branches)) continue;
+              const defaultBranch = (repo as { default_branch?: string }).default_branch || "main";
+              for (const b of branches) {
+                const branchName = (b as { name?: string }).name;
+                if (!branchName || branchName === defaultBranch) continue;
+                const commitsRes = await fetch(
+                  `${GITHUB_API}/repos/${repo.full_name}/commits?sha=${encodeURIComponent(branchName)}&since=${sinceISO}&per_page=30`,
+                  { headers }
+                );
+                if (!commitsRes.ok) continue;
+                const branchCommits = await commitsRes.json();
+                addCommits(branchCommits);
+              }
             }
           }
 

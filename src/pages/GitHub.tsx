@@ -331,15 +331,6 @@ export default function GitHub() {
   const [repoToDelete, setRepoToDelete] = useState<GitHubRepo | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const { linkGitHub } = useAuth();
-
-  const handleConnectWithGitHub = async () => {
-    const { error } = await linkGitHub(`${window.location.origin}/github`);
-    if (error) {
-      toast.error(error.message || "Failed to connect with GitHub");
-    }
-  };
-
   const handleConnectWithUsername = () => {
     const trimmed = inputUsername.trim();
     if (trimmed) fetchUserAndRepos(trimmed);
@@ -434,39 +425,25 @@ export default function GitHub() {
               <div>
                 <h3 className="font-semibold text-lg">Connect your GitHub</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  One click to connect and see your repos and coding activity
+                  Enter your GitHub username to see your repos and coding activity
                 </p>
               </div>
-              <Button
-                size="lg"
-                className="w-full max-w-sm mx-auto"
-                onClick={handleConnectWithGitHub}
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                ) : (
-                  <Github className="w-4 h-4 mr-2" />
-                )}
-                Connect with GitHub
-              </Button>
-              <details className="text-left max-w-sm mx-auto">
-                <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
-                  Or connect with username only (read-only)
-                </summary>
-                <div className="flex gap-2 mt-2">
-                  <Input
-                    placeholder="GitHub username"
-                    value={inputUsername}
-                    onChange={(e) => setInputUsername(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleConnectWithUsername()}
-                    className="flex-1"
-                  />
-                  <Button variant="outline" onClick={handleConnectWithUsername} disabled={isLoading}>
-                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Connect"}
-                  </Button>
-                </div>
-              </details>
+              <div className="flex gap-2 max-w-sm mx-auto">
+                <Input
+                  placeholder="Your GitHub username"
+                  value={inputUsername}
+                  onChange={(e) => setInputUsername(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleConnectWithUsername()}
+                  className="flex-1"
+                />
+                <Button onClick={handleConnectWithUsername} disabled={isLoading}>
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Connect"
+                  )}
+                </Button>
+              </div>
               {error && (
                 <div className="flex items-center gap-2 text-destructive text-sm">
                   <AlertCircle className="w-4 h-4" />
@@ -561,6 +538,11 @@ export default function GitHub() {
                       Disconnect
                     </Button>
                   </div>
+                  {repos.some((r) => r.private) && (
+                    <p className="text-xs text-muted-foreground mt-3">
+                      Private repos need the repo scope. If pushes don&apos;t show, disconnect and reconnect with GitHub.
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
