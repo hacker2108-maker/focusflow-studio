@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff, Cloud, Palette, Globe, Shield, Smartphone, ChevronRight, Vibrate, Clock, Timer, Eye, Zap } from "lucide-react";
+import { Moon, Sun, Download, Upload, Trash2, LogOut, Bell, BellOff, Cloud, Palette, Globe, Shield, Smartphone, ChevronRight, Vibrate, Clock, Timer, Eye, Zap, Github } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 import { useSettingsStore } from "@/store/settingsStore";
 import { useHabitStore } from "@/store/habitStore";
 import { useFocusStore } from "@/store/focusStore";
 import { useJournalStore } from "@/store/journalStore";
 import { useCalendarStore } from "@/store/calendarStore";
+import { useGitHubStore } from "@/store/githubStore";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { requestNotificationPermission } from "@/lib/notifications";
@@ -23,6 +24,7 @@ export default function Settings() {
   const { signOut, user } = useAuth();
   const { settings, setTheme, updateSettings, resetSettings, clearAllData: clearSettings, weeklyReviews } = useSettingsStore();
   const { habits, logs, clearAllData: clearHabits } = useHabitStore();
+  const { accessToken, setAccessToken } = useGitHubStore();
   const { sessions, preset, updatePreset, clearAllData: clearFocus } = useFocusStore();
   const { entries: journalEntries, clearAllData: clearJournal } = useJournalStore();
   const { events, clearAllData: clearCalendar } = useCalendarStore();
@@ -370,6 +372,41 @@ export default function Settings() {
             >
               {syncing ? "Syncing..." : "Sync Now"}
             </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* GitHub */}
+      <Card className="glass">
+        <CardContent className="p-6 space-y-4">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Github className="w-4 h-4 text-primary" />
+            GitHub
+          </h3>
+          <div>
+            <p className="font-medium">Access Token (for editing)</p>
+            <p className="text-sm text-muted-foreground mb-2">
+              Add a Personal Access Token to edit files in the app. Create one at github.com/settings/tokens with repo scope.
+            </p>
+            <div className="flex gap-2">
+              {accessToken ? (
+                <>
+                  <div className="flex-1 flex items-center px-3 py-2 rounded-md border bg-secondary/30 text-sm text-muted-foreground">
+                    Token configured
+                  </div>
+                  <Button variant="ghost" size="sm" onClick={() => setAccessToken(null)}>
+                    Clear
+                  </Button>
+                </>
+              ) : (
+                <Input
+                  type="password"
+                  placeholder="ghp_..."
+                  onChange={(e) => setAccessToken(e.target.value || null)}
+                  className="font-mono flex-1"
+                />
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>

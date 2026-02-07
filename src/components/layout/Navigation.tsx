@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { Home, Target, Timer, BarChart3, Settings, BookOpen, CalendarDays, MapPin, StickyNote, Navigation } from "lucide-react";
+import { Home, Target, Timer, BarChart3, Settings, BookOpen, CalendarDays, MapPin, StickyNote, Navigation, Github } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion } from "framer-motion";
 import {
@@ -13,7 +13,7 @@ const navItems = [
   { to: "/", icon: Home, label: "Home" },
   { to: "/habits", icon: Target, label: "Habits" },
   { to: "/focus", icon: Timer, label: "Focus" },
-  { to: "/activity", icon: MapPin, label: "Activity" },
+  { to: "/github", icon: Github, label: "GitHub" },
   { to: "/notes", icon: StickyNote, label: "Notes" },
 ];
 
@@ -62,6 +62,7 @@ export function BottomNav() {
 
 const sidebarNavItems = [
   ...navItems,
+  { to: "/activity", icon: MapPin, label: "Activity" },
   { to: "/navigate", icon: Navigation, label: "Navigate" },
   { to: "/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/journal", icon: BookOpen, label: "Journal" },

@@ -18,6 +18,8 @@ const Profile = lazy(() => import("./pages/Profile"));
 const Journal = lazy(() => import("./pages/Journal"));
 const Calendar = lazy(() => import("./pages/Calendar"));
 const Activity = lazy(() => import("./pages/Activity"));
+const GitHub = lazy(() => import("./pages/GitHub"));
+const GitHubRepoPage = lazy(() => import("./pages/GitHubRepo"));
 const Navigate = lazy(() => import("./pages/Navigate"));
 const Notes = lazy(() => import("./pages/Notes"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -50,6 +52,8 @@ const App = () => (
                       <Route path="/journal" element={<Suspense fallback={<PageLoader />}><Journal /></Suspense>} />
                       <Route path="/calendar" element={<Suspense fallback={<PageLoader />}><Calendar /></Suspense>} />
                       <Route path="/activity" element={<Suspense fallback={<PageLoader />}><Activity /></Suspense>} />
+                      <Route path="/github" element={<Suspense fallback={<PageLoader />}><GitHub /></Suspense>} />
+                      <Route path="/github/repo/:owner/:name" element={<Suspense fallback={<PageLoader />}><GitHubRepoPage /></Suspense>} />
                       <Route path="/navigate" element={<Suspense fallback={<PageLoader />}><Navigate /></Suspense>} />
                       <Route path="/notes" element={<Suspense fallback={<PageLoader />}><Notes /></Suspense>} />
                       <Route path="/insights" element={<Suspense fallback={<PageLoader />}><Insights /></Suspense>} />
