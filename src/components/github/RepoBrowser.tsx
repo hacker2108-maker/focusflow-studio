@@ -212,9 +212,9 @@ export function RepoBrowser({
   if (!repo) return null;
 
   return (
-    <div className="flex flex-col h-full min-h-screen">
+    <div className="flex flex-col h-full">
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2 p-4 border-b shrink-0 flex-wrap bg-background">
+      <div className="flex items-center gap-2 p-3 border-b shrink-0 flex-wrap">
         <Button variant="ghost" size="sm" onClick={path.length ? goBack : () => onOpenChange(false)}>
           <ArrowLeft className="w-4 h-4" />
         </Button>
