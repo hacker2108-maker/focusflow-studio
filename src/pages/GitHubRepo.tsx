@@ -32,7 +32,7 @@ export default function GitHubRepo() {
   }, [owner, name, repos]);
 
   return (
-    <div className="fixed inset-0 z-40 bg-background flex flex-col">
+    <div className="fixed inset-0 z-40 bg-background flex flex-col repo-safe-shell min-h-[100dvh]">
       <RepoBrowser
         repo={repo}
         open={!!repo}
