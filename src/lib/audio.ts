@@ -11,26 +11,40 @@ export class AlarmSound {
     return this.audioContext;
   }
 
+  /** Warm up AudioContext on user gesture (call when starting timer) */
+  warmUp(): void {
+    void this.resumeContext();
+  }
+
+  /** Resume AudioContext if suspended (required by browser autoplay policy) */
+  private async resumeContext(): Promise<void> {
+    const ctx = this.getAudioContext();
+    if (ctx.state === "suspended") {
+      await ctx.resume();
+    }
+  }
+
   playAlarm(type: AlarmSoundType = "chime"): void {
     if (type === "none") return;
-    
-    switch (type) {
-      case "chime":
-        this.playChime();
-        break;
-      case "bell":
-        this.playBell();
-        break;
-      case "gentle":
-        this.playGentle();
-        break;
-      case "melody":
-        this.playMelody();
-        break;
-      case "song":
-        this.playSong();
-        break;
-    }
+    void this.resumeContext().then(() => {
+      switch (type) {
+        case "chime":
+          this.playChime();
+          break;
+        case "bell":
+          this.playBell();
+          break;
+        case "gentle":
+          this.playGentle();
+          break;
+        case "melody":
+          this.playMelody();
+          break;
+        case "song":
+          this.playSong();
+          break;
+      }
+    });
   }
 
   private playChime(): void {
@@ -255,40 +269,37 @@ export class AlarmSound {
 
   playBreakEnd(type: AlarmSoundType = "chime"): void {
     if (type === "none") return;
-    if (type === "song") {
-      this.playMelody(); // Shorter version for break end
-      return;
-    }
-    
-    const ctx = this.getAudioContext();
-    const now = ctx.currentTime;
-
-    // Softer, shorter sound for break end
-    const frequencies = [392, 523.25]; // G4, C5
-    
-    frequencies.forEach((freq, index) => {
-      const oscillator = ctx.createOscillator();
-      const gainNode = ctx.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(ctx.destination);
-      
-      oscillator.type = 'sine';
-      oscillator.frequency.setValueAtTime(freq, now + index * 0.2);
-      
-      gainNode.gain.setValueAtTime(0, now + index * 0.2);
-      gainNode.gain.linearRampToValueAtTime(0.2, now + index * 0.2 + 0.05);
-      gainNode.gain.exponentialRampToValueAtTime(0.01, now + index * 0.2 + 0.3);
-      
-      oscillator.start(now + index * 0.2);
-      oscillator.stop(now + index * 0.2 + 0.3);
+    void this.resumeContext().then(() => {
+      if (type === "song") {
+        this.playMelody();
+        return;
+      }
+      const ctx = this.getAudioContext();
+      const now = ctx.currentTime;
+      const frequencies = [392, 523.25];
+      frequencies.forEach((freq, index) => {
+        const oscillator = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+        oscillator.connect(gainNode);
+        gainNode.connect(ctx.destination);
+        oscillator.type = "sine";
+        oscillator.frequency.setValueAtTime(freq, now + index * 0.2);
+        gainNode.gain.setValueAtTime(0, now + index * 0.2);
+        gainNode.gain.linearRampToValueAtTime(0.2, now + index * 0.2 + 0.05);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + index * 0.2 + 0.3);
+        oscillator.start(now + index * 0.2);
+        oscillator.stop(now + index * 0.2 + 0.3);
+      });
     });
   }
 
   // Test sound preview
   playPreview(type: AlarmSoundType): void {
     if (type === "none") return;
-    
+    void this.resumeContext().then(() => this.playPreviewSound(type));
+  }
+
+  private playPreviewSound(type: AlarmSoundType): void {
     const ctx = this.getAudioContext();
     const now = ctx.currentTime;
     
@@ -326,7 +337,6 @@ export class AlarmSound {
         });
         return;
     }
-    
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
     

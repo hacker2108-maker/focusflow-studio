@@ -5,7 +5,7 @@ import { useScreenWakeLock } from "@/hooks/useScreenWakeLock";
 import { useHabitStore } from "@/store/habitStore";
 import { formatTime, getToday, isHabitDueToday } from "@/lib/utils";
 import { alarmSound, AlarmSoundType } from "@/lib/audio";
-import { requestNotificationPermission, scheduleTimerNotificationViaSW, cancelTimerNotificationViaSW } from "@/lib/notifications";
+import { requestNotificationPermission, scheduleTimerNotificationViaSW, cancelTimerNotificationViaSW, clearScheduledNotification, showNotificationNow } from "@/lib/notifications";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -58,12 +58,14 @@ export default function Focus() {
 
       if (remaining <= 0 && !hasHandledCompletionRef.current) {
         hasHandledCompletionRef.current = true;
+        clearScheduledNotification();
         if (timer.phase === "work") {
           setShowCompleteDialog(true);
           alarmSound.playAlarm(preset.alarmSound);
-          // Notification shown via service worker (scheduled at timer start) - works when app is background/closed
+          showNotificationNow("Focus session complete!", timer.task || "Great work! Time for a break.");
         } else {
           alarmSound.playBreakEnd(preset.alarmSound);
+          showNotificationNow("Break is over! ☕", "Ready for the next focus session?");
           toast.success("Break complete! Ready for the next session?");
           completeSession();
         }
@@ -80,7 +82,7 @@ export default function Focus() {
       const granted = await requestNotificationPermission();
       setNotificationsEnabled(granted);
       if (granted) {
-        toast.success("Notifications enabled! You'll be notified when your focus session ends.", { duration: 3000 });
+        toast.success("Notifications enabled! Keep the app in the background to get notified when the timer ends.", { duration: 4000 });
       }
     };
     checkPermission();
@@ -91,30 +93,20 @@ export default function Focus() {
     : 0;
 
   const handleStart = () => {
+    alarmSound.warmUp();
     const duration = mode === "pomodoro" ? preset.workMinutes * 60 : preset.deepFocusMinutes * 60;
     startTimer(mode, task.trim() || undefined, duration);
     toast.success(`${mode === "pomodoro" ? "Pomodoro" : "Deep Focus"} started`);
   };
 
-  // Schedule SW notification when phase changes (break → work, work → break)
+  // Schedule notification when phase changes - works when app is in background (minimize, don't close)
   useEffect(() => {
     if (!timer.isRunning || timer.isPaused || !timer.startTimestamp) return;
     const endTime = timer.startTimestamp + timer.totalDuration * 1000;
-    // Only schedule if end time is in the future (avoid immediate notification on page load)
     if (endTime <= Date.now() + 1000) return;
-    if (timer.phase === "work") {
-      scheduleTimerNotificationViaSW(
-        endTime,
-        "Focus session complete!",
-        timer.task || "Great work! Time for a break."
-      );
-    } else {
-      scheduleTimerNotificationViaSW(
-        endTime,
-        "Break is over! ☕",
-        "Ready for the next focus session?"
-      );
-    }
+    const title = timer.phase === "work" ? "Focus session complete!" : "Break is over! ☕";
+    const body = timer.phase === "work" ? timer.task || "Great work! Time for a break." : "Ready for the next focus session?";
+    scheduleTimerNotificationViaSW(endTime, title, body);
   }, [timer.isRunning, timer.isPaused, timer.startTimestamp, timer.phase, timer.totalDuration, timer.task]);
 
   // Cancel scheduled notification when pausing or resetting
@@ -316,7 +308,7 @@ export default function Focus() {
           <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/60 border border-border/50 text-sm text-muted-foreground">
             <Smartphone className="w-4 h-4 shrink-0 text-primary" />
             <span>
-              <strong className="text-foreground">Focus mode:</strong> Enable Do Not Disturb on your device to block other app notifications and messages.
+              <strong className="text-foreground">Tip:</strong> You'll get notified when the timer ends—even if you open the app later. For instant alerts, keep the app in the background.
             </span>
           </div>
         )}
