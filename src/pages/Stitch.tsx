@@ -50,6 +50,10 @@ interface CanvasElement {
   fill?: string;
   /** For AI-generated layouts: section role so we can style and label like real UI */
   sectionKind?: SectionKind;
+  /** Rich content — shown inside the element like a real design tool */
+  content?: string;
+  subline?: string;
+  ctaText?: string;
 }
 
 const DEFAULT_FILL = "hsl(var(--primary) / 0.12)";
@@ -77,43 +81,73 @@ function themeFromPrompt(prompt: string): string {
   return "Landing Page";
 }
 
-/** Full landing page layout: frame + Nav, Hero, Features (3 cards), CTA, Footer — like Google Stitch */
+/** Theme-aware copy for landing sections */
+function landingCopy(theme: string) {
+  const t = theme.toLowerCase();
+  const brand = theme;
+  const hero: Record<string, { headline: string; subline: string; cta: string }> = {
+    "coffee shop": { headline: "Fresh Roasted Coffee", subline: "Small-batch beans, delivered. Start your day right.", cta: "Order now" },
+    "saas": { headline: "Ship faster, together", subline: "The one place for your team's tasks, docs, and goals.", cta: "Start free trial" },
+    "fitness": { headline: "Your best shape starts here", subline: "Personal plans, live classes, and tracking that works.", cta: "Get started" },
+    "restaurant": { headline: "Eat well, feel good", subline: "Seasonal menus and a table for every occasion.", cta: "Reserve a table" },
+    "ecommerce": { headline: "Quality you can trust", subline: "Curated products, fast delivery, easy returns.", cta: "Shop now" },
+    "portfolio": { headline: "Design & build", subline: "Selected work and what I'm up to next.", cta: "View work" },
+    "blog": { headline: "Stories and ideas", subline: "Thoughts on design, code, and building things.", cta: "Read more" },
+  };
+  const norm = (s: string) => s.toLowerCase().replace(/[\s\-‑]/g, "");
+  const themeNorm = norm(theme);
+  const key = Object.keys(hero).find((k) => themeNorm.includes(norm(k)) || norm(k).includes(themeNorm)) || "landing";
+  const h = hero[key] || { headline: `Welcome to ${brand}`, subline: "Your tagline or value proposition here.", cta: "Get started" };
+  const nav = brand === "Landing Page" ? "Logo    Home    About    Contact" : `${brand}    Home    About    Contact`;
+  const features = [
+    { title: "Simple", desc: "Clear and easy to use, every time." },
+    { title: "Fast", desc: "Built for speed and reliability." },
+    { title: "Support", desc: "We're here when you need us." },
+  ];
+  const footer = "© 2025 " + brand + "    Privacy    Terms    Contact";
+  return { nav, hero: h, features, ctaHeadline: "Ready to get started?", ctaButton: h.cta, footer };
+}
+
+/** Full landing page layout with real content */
 function generateLandingLayout(theme: string): Omit<CanvasElement, "id">[] {
   const w = 1280;
   const h = 800;
   const pad = 0;
   const cx = -w / 2;
   const cy = -h / 2;
+  const copy = landingCopy(theme);
+  const fw = (w - 32 * 4) / 3;
   return [
     { type: "frame", x: cx, y: cy, width: w, height: h, fill: "hsl(var(--card))", label: theme, sectionKind: null },
-    { type: "rect", x: cx + pad, y: cy + pad, width: w - pad * 2, height: 56, fill: "hsl(var(--foreground) / 0.08)", label: "Nav", sectionKind: "nav" },
-    { type: "rect", x: cx + pad, y: cy + 56 + pad, width: w - pad * 2, height: 380, fill: "hsl(var(--primary) / 0.12)", label: "Hero — Headline & CTA", sectionKind: "hero" },
-    { type: "rect", x: cx + 32, y: cy + 56 + 380 + 32, width: (w - 32 * 4) / 3, height: 180, fill: "hsl(var(--card))", label: "Feature 1", sectionKind: "featureCard" },
-    { type: "rect", x: cx + 32 + (w - 32 * 4) / 3 + 32, y: cy + 56 + 380 + 32, width: (w - 32 * 4) / 3, height: 180, fill: "hsl(var(--card))", label: "Feature 2", sectionKind: "featureCard" },
-    { type: "rect", x: cx + 32 + ((w - 32 * 4) / 3 + 32) * 2, y: cy + 56 + 380 + 32, width: (w - 32 * 4) / 3, height: 180, fill: "hsl(var(--card))", label: "Feature 3", sectionKind: "featureCard" },
-    { type: "rect", x: cx + pad, y: cy + 56 + 380 + 32 + 180 + 32, width: w - pad * 2, height: 140, fill: "hsl(var(--primary) / 0.2)", label: "CTA — Sign up / Get started", sectionKind: "cta" },
-    { type: "rect", x: cx + pad, y: cy + h - 80 - pad, width: w - pad * 2, height: 80, fill: "hsl(var(--foreground) / 0.06)", label: "Footer — Links & copyright", sectionKind: "footer" },
+    { type: "rect", x: cx + pad, y: cy + pad, width: w - pad * 2, height: 56, fill: "hsl(var(--foreground) / 0.08)", label: "Nav", sectionKind: "nav", content: copy.nav },
+    { type: "rect", x: cx + pad, y: cy + 56 + pad, width: w - pad * 2, height: 380, fill: "hsl(var(--primary) / 0.12)", label: "Hero", sectionKind: "hero", content: copy.hero.headline, subline: copy.hero.subline, ctaText: copy.hero.cta },
+    { type: "rect", x: cx + 32, y: cy + 56 + 380 + 32, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[0].title, sectionKind: "featureCard", content: copy.features[0].title, subline: copy.features[0].desc },
+    { type: "rect", x: cx + 32 + fw + 32, y: cy + 56 + 380 + 32, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[1].title, sectionKind: "featureCard", content: copy.features[1].title, subline: copy.features[1].desc },
+    { type: "rect", x: cx + 32 + (fw + 32) * 2, y: cy + 56 + 380 + 32, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[2].title, sectionKind: "featureCard", content: copy.features[2].title, subline: copy.features[2].desc },
+    { type: "rect", x: cx + pad, y: cy + 56 + 380 + 32 + 180 + 32, width: w - pad * 2, height: 140, fill: "hsl(var(--primary) / 0.2)", label: "CTA", sectionKind: "cta", content: copy.ctaHeadline, ctaText: copy.ctaButton },
+    { type: "rect", x: cx + pad, y: cy + h - 80 - pad, width: w - pad * 2, height: 80, fill: "hsl(var(--foreground) / 0.06)", label: "Footer", sectionKind: "footer", content: copy.footer },
   ];
 }
 
-/** Mobile app screen: status bar, nav, content, tab bar */
+/** Mobile app screen with content */
 function generateAppScreenLayout(theme: string): Omit<CanvasElement, "id">[] {
   const w = 390;
   const h = 844;
   const cx = -w / 2;
   const cy = -h / 2;
+  const title = theme === "Landing Page" ? "Home" : theme;
   return [
     { type: "frame", x: cx, y: cy, width: w, height: h, fill: "hsl(var(--card))", label: theme, sectionKind: null },
-    { type: "rect", x: cx, y: cy, width: w, height: 44, fill: "hsl(var(--foreground) / 0.06)", label: "Status bar", sectionKind: "header" },
-    { type: "rect", x: cx, y: cy + 44, width: w, height: 56, fill: "hsl(var(--foreground) / 0.08)", label: "Nav / Title", sectionKind: "nav" },
-    { type: "rect", x: cx + 16, y: cy + 44 + 56 + 24, width: w - 32, height: 200, fill: "hsl(var(--primary) / 0.1)", label: "Content block", sectionKind: "content" },
-    { type: "rect", x: cx + 16, y: cy + 44 + 56 + 24 + 200 + 24, width: w - 32, height: 120, fill: "hsl(var(--card))", label: "Card", sectionKind: "featureCard" },
-    { type: "rect", x: cx + 16, y: cy + 44 + 56 + 24 + 200 + 24 + 120 + 24, width: w - 32, height: 48, fill: "hsl(var(--primary))", label: "Button", sectionKind: "button" },
-    { type: "rect", x: cx, y: cy + h - 84, width: w, height: 84, fill: "hsl(var(--foreground) / 0.08)", label: "Tab bar", sectionKind: "tabBar" },
+    { type: "rect", x: cx, y: cy, width: w, height: 44, fill: "hsl(var(--foreground) / 0.06)", label: "Status bar", sectionKind: "header", content: "9:41" },
+    { type: "rect", x: cx, y: cy + 44, width: w, height: 56, fill: "hsl(var(--foreground) / 0.08)", label: "Nav", sectionKind: "nav", content: title },
+    { type: "rect", x: cx + 16, y: cy + 44 + 56 + 24, width: w - 32, height: 200, fill: "hsl(var(--primary) / 0.1)", label: "Content", sectionKind: "content", content: "Featured content", subline: "Add your main message or card here." },
+    { type: "rect", x: cx + 16, y: cy + 44 + 56 + 24 + 200 + 24, width: w - 32, height: 120, fill: "hsl(var(--card))", label: "Card", sectionKind: "featureCard", content: "Card title", subline: "Short description or CTA." },
+    { type: "rect", x: cx + 16, y: cy + 44 + 56 + 24 + 200 + 24 + 120 + 24, width: w - 32, height: 48, fill: "hsl(var(--primary))", label: "Button", sectionKind: "button", content: "Continue", ctaText: "Continue" },
+    { type: "rect", x: cx, y: cy + h - 84, width: w, height: 84, fill: "hsl(var(--foreground) / 0.08)", label: "Tab bar", sectionKind: "tabBar", content: "Home    Explore    Profile" },
   ];
 }
 
-/** Dashboard: sidebar + header + content grid */
+/** Dashboard with content */
 function generateDashboardLayout(theme: string): Omit<CanvasElement, "id">[] {
   const w = 1440;
   const h = 900;
@@ -127,27 +161,28 @@ function generateDashboardLayout(theme: string): Omit<CanvasElement, "id">[] {
   const top = cy + headH + pad;
   return [
     { type: "frame", x: cx, y: cy, width: w, height: h, fill: "hsl(var(--card))", label: theme, sectionKind: null },
-    { type: "rect", x: cx, y: cy, width: sideW, height: h, fill: "hsl(var(--foreground) / 0.06)", label: "Sidebar", sectionKind: "sidebar" },
-    { type: "rect", x: cx + sideW, y: cy, width: w - sideW, height: headH, fill: "hsl(var(--foreground) / 0.08)", label: "Header", sectionKind: "header" },
-    { type: "rect", x: cx + sideW + pad, y: top, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 1", sectionKind: "featureCard" },
-    { type: "rect", x: cx + sideW + pad + cardW + pad, y: top, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 2", sectionKind: "featureCard" },
-    { type: "rect", x: cx + sideW + pad, y: top + cardH + pad, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 3", sectionKind: "featureCard" },
-    { type: "rect", x: cx + sideW + pad + cardW + pad, y: top + cardH + pad, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 4", sectionKind: "featureCard" },
+    { type: "rect", x: cx, y: cy, width: sideW, height: h, fill: "hsl(var(--foreground) / 0.06)", label: "Sidebar", sectionKind: "sidebar", content: "Dashboard\nAnalytics\nSettings\nTeam" },
+    { type: "rect", x: cx + sideW, y: cy, width: w - sideW, height: headH, fill: "hsl(var(--foreground) / 0.08)", label: "Header", sectionKind: "header", content: "Dashboard · Overview" },
+    { type: "rect", x: cx + sideW + pad, y: top, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 1", sectionKind: "featureCard", content: "Total revenue", subline: "$12,450" },
+    { type: "rect", x: cx + sideW + pad + cardW + pad, y: top, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 2", sectionKind: "featureCard", content: "Active users", subline: "1,234" },
+    { type: "rect", x: cx + sideW + pad, y: top + cardH + pad, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 3", sectionKind: "featureCard", content: "Conversion", subline: "3.2%" },
+    { type: "rect", x: cx + sideW + pad + cardW + pad, y: top + cardH + pad, width: cardW, height: cardH, fill: "hsl(var(--card))", label: "Card 4", sectionKind: "featureCard", content: "Orders", subline: "89" },
   ];
 }
 
-/** Form / signup: centered card with logo, inputs, button */
+/** Form / signup with content */
 function generateFormLayout(theme: string): Omit<CanvasElement, "id">[] {
   const cardW = 400;
   const cardH = 420;
   const cx = -cardW / 2;
   const cy = -cardH / 2;
+  const brand = theme === "Landing Page" ? "Sign in" : theme;
   return [
     { type: "frame", x: cx, y: cy, width: cardW, height: cardH, fill: "hsl(var(--card))", label: theme, sectionKind: null },
-    { type: "rect", x: cx + 32, y: cy + 24, width: cardW - 64, height: 48, fill: "hsl(var(--foreground) / 0.06)", label: "Logo", sectionKind: "logo" },
-    { type: "rect", x: cx + 32, y: cy + 24 + 48 + 24, width: cardW - 64, height: 44, fill: "hsl(var(--background))", label: "Email", sectionKind: "input" },
-    { type: "rect", x: cx + 32, y: cy + 24 + 48 + 24 + 44 + 16, width: cardW - 64, height: 44, fill: "hsl(var(--background))", label: "Password", sectionKind: "input" },
-    { type: "rect", x: cx + 32, y: cy + cardH - 24 - 48, width: cardW - 64, height: 48, fill: "hsl(var(--primary))", label: "Submit", sectionKind: "button" },
+    { type: "rect", x: cx + 32, y: cy + 24, width: cardW - 64, height: 48, fill: "hsl(var(--foreground) / 0.06)", label: "Logo", sectionKind: "logo", content: brand },
+    { type: "rect", x: cx + 32, y: cy + 24 + 48 + 24, width: cardW - 64, height: 44, fill: "hsl(var(--background))", label: "Email", sectionKind: "input", content: "Email address" },
+    { type: "rect", x: cx + 32, y: cy + 24 + 48 + 24 + 44 + 16, width: cardW - 64, height: 44, fill: "hsl(var(--background))", label: "Password", sectionKind: "input", content: "Password" },
+    { type: "rect", x: cx + 32, y: cy + cardH - 24 - 48, width: cardW - 64, height: 48, fill: "hsl(var(--primary))", label: "Submit", sectionKind: "button", content: "Sign in", ctaText: "Sign in" },
   ];
 }
 
@@ -322,6 +357,7 @@ export default function Stitch() {
           height: isLine ? 0 : type === "text" ? 24 : 80,
           fill: DEFAULT_FILL,
           label: type === "text" ? "Text" : undefined,
+          content: type === "text" ? "Text" : undefined,
         };
         if (isLine) newEl.height = 4;
         if (isStar) {
@@ -435,6 +471,30 @@ export default function Stitch() {
       if (el.type === "rect" || el.type === "frame") {
         ctx.fillRect(x, y, el.width, el.height);
         ctx.strokeRect(x, y, el.width, el.height);
+        if (el.content || el.subline || el.ctaText) {
+          ctx.fillStyle = "hsl(var(--foreground) / 0.9)";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          const cx = x + el.width / 2;
+          let ty = y + el.height / 2;
+          if (el.sectionKind === "hero") {
+            ctx.font = "bold 18px system-ui";
+            ctx.fillText(el.content || "", cx, ty - 16);
+            if (el.subline) { ctx.font = "12px system-ui"; ctx.fillText(el.subline, cx, ty); ty += 20; }
+            if (el.ctaText) { ctx.font = "12px system-ui"; ctx.fillText(el.ctaText, cx, ty + 12); }
+          } else if (el.sectionKind === "cta") {
+            ctx.font = "bold 14px system-ui";
+            ctx.fillText(el.content || "", cx, ty - 12);
+            if (el.ctaText) { ctx.font = "12px system-ui"; ctx.fillText(el.ctaText, cx, ty + 10); }
+          } else {
+            ctx.font = "12px system-ui";
+            ctx.fillText(el.content || el.label || "", cx, el.subline ? ty - 8 : ty);
+            if (el.subline) ctx.fillText(el.subline, cx, ty + 10);
+            if (el.ctaText && el.sectionKind === "button") ctx.fillText(el.ctaText, cx, ty);
+          }
+          ctx.textAlign = "left";
+          ctx.textBaseline = "alphabetic";
+        }
       } else if (el.type === "circle") {
         ctx.beginPath();
         ctx.ellipse(x + el.width / 2, y + el.height / 2, el.width / 2, el.height / 2, 0, 0, Math.PI * 2);
@@ -443,7 +503,9 @@ export default function Stitch() {
       } else if (el.type === "text") {
         ctx.fillStyle = "hsl(var(--foreground))";
         ctx.font = "14px system-ui";
-        ctx.fillText(el.label || "Text", x, y + el.height / 2 + 4);
+        ctx.textAlign = "center";
+        ctx.fillText(el.content || el.label || "Text", x + el.width / 2, y + el.height / 2 + 4);
+        ctx.textAlign = "left";
       } else if (el.type === "line" || el.type === "arrow") {
         ctx.strokeStyle = "hsl(var(--foreground) / 0.8)";
         ctx.beginPath();
@@ -834,10 +896,72 @@ export default function Stitch() {
                     <div className="w-full h-full rounded-full border-2 border-border/60" style={{ backgroundColor: el.fill }} />
                   )}
                   {el.type === "text" && (
-                    <span className="text-xs font-medium text-muted-foreground">{el.label || "Text"}</span>
+                    <span className="text-sm font-medium text-foreground/90 px-2 text-center break-words">
+                      {el.content || el.label || "Text"}
+                    </span>
                   )}
-                  {(el.type === "frame" || (el.type === "rect" && (el.sectionKind || el.label))) && el.label && (
-                    <span className="absolute top-2 left-2 text-[10px] font-medium text-muted-foreground truncate max-w-[calc(100%-8px)]">
+                  {/* Rich section content — like a real design tool */}
+                  {el.type === "rect" && (el.content != null || el.subline != null || el.ctaText != null) && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center p-2 overflow-hidden pointer-events-none rounded-sm">
+                      {el.sectionKind === "nav" && (
+                        <span className="text-[11px] font-medium text-foreground/80 truncate w-full text-center">{el.content}</span>
+                      )}
+                      {el.sectionKind === "hero" && (
+                        <>
+                          <span className="text-lg font-bold text-foreground/90 text-center leading-tight line-clamp-2">{el.content}</span>
+                          {el.subline && <span className="text-[11px] text-foreground/70 text-center mt-1 line-clamp-2">{el.subline}</span>}
+                          {el.ctaText && <span className="mt-2 px-3 py-1.5 rounded-md bg-primary/90 text-primary-foreground text-[11px] font-medium">{el.ctaText}</span>}
+                        </>
+                      )}
+                      {el.sectionKind === "featureCard" && (
+                        <>
+                          <span className="text-xs font-semibold text-foreground/90 text-center">{el.content || el.label}</span>
+                          {el.subline && <span className="text-[10px] text-foreground/70 text-center mt-0.5 line-clamp-2">{el.subline}</span>}
+                        </>
+                      )}
+                      {el.sectionKind === "cta" && (
+                        <>
+                          <span className="text-sm font-semibold text-foreground/90 text-center">{el.content}</span>
+                          {el.ctaText && <span className="mt-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-xs font-medium">{el.ctaText}</span>}
+                        </>
+                      )}
+                      {el.sectionKind === "footer" && (
+                        <span className="text-[10px] text-foreground/60 text-center leading-tight whitespace-pre-line line-clamp-3">{el.content}</span>
+                      )}
+                      {el.sectionKind === "sidebar" && (
+                        <span className="text-[10px] text-foreground/80 text-left w-full whitespace-pre-line line-clamp-8 pl-2">{el.content}</span>
+                      )}
+                      {el.sectionKind === "header" && (
+                        <span className="text-xs font-medium text-foreground/80 truncate w-full text-center">{el.content}</span>
+                      )}
+                      {el.sectionKind === "content" && (
+                        <>
+                          <span className="text-xs font-semibold text-foreground/90 text-center">{el.content}</span>
+                          {el.subline && <span className="text-[10px] text-foreground/70 text-center mt-0.5 line-clamp-2">{el.subline}</span>}
+                        </>
+                      )}
+                      {el.sectionKind === "tabBar" && (
+                        <span className="text-[10px] font-medium text-foreground/70 text-center">{el.content}</span>
+                      )}
+                      {el.sectionKind === "logo" && (
+                        <span className="text-sm font-semibold text-foreground/90">{el.content || el.label}</span>
+                      )}
+                      {(el.sectionKind === "input" || el.sectionKind === "button") && (
+                        <span className={cn(
+                          "text-xs truncate w-full text-center px-2",
+                          el.sectionKind === "button" ? "font-medium text-primary-foreground" : "text-muted-foreground"
+                        )}>
+                          {el.ctaText || el.content || el.label}
+                        </span>
+                      )}
+                      {el.sectionKind == null && el.content != null && (
+                        <span className="text-xs text-foreground/80 text-center line-clamp-3">{el.content}</span>
+                      )}
+                    </div>
+                  )}
+                  {/* Frame/section label (small, top-left) when no rich content */}
+                  {(el.type === "frame" || (el.type === "rect" && !el.content && !el.subline && !el.ctaText)) && el.label && (
+                    <span className="absolute top-1.5 left-1.5 text-[10px] font-medium text-muted-foreground/80 truncate max-w-[calc(100%-8px)]">
                       {el.label}
                     </span>
                   )}
@@ -903,6 +1027,48 @@ export default function Stitch() {
               {selected ? (
                 <>
                   <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-muted-foreground">Content (main text)</label>
+                    <input
+                      type="text"
+                      value={selected.content ?? ""}
+                      onChange={(e) =>
+                        setElements((prev) =>
+                          prev.map((el) => (el.id === selectedId ? { ...el, content: e.target.value || undefined } : el))
+                        )
+                      }
+                      placeholder="Headline, title, or label"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-muted-foreground">Subline (secondary)</label>
+                    <input
+                      type="text"
+                      value={selected.subline ?? ""}
+                      onChange={(e) =>
+                        setElements((prev) =>
+                          prev.map((el) => (el.id === selectedId ? { ...el, subline: e.target.value || undefined } : el))
+                        )
+                      }
+                      placeholder="Description or subtitle"
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-medium text-muted-foreground">Button / CTA text</label>
+                    <input
+                      type="text"
+                      value={selected.ctaText ?? ""}
+                      onChange={(e) =>
+                        setElements((prev) =>
+                          prev.map((el) => (el.id === selectedId ? { ...el, ctaText: e.target.value || undefined } : el))
+                        )
+                      }
+                      placeholder="Get started, Sign in..."
+                      className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <label className="text-[11px] font-medium text-muted-foreground">Position</label>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
@@ -935,7 +1101,7 @@ export default function Stitch() {
                 </>
               ) : (
                 <p className="text-xs text-muted-foreground/80">
-                  Select a layer to edit its properties.
+                  Select a layer to edit content and properties.
                 </p>
               )}
             </div>
