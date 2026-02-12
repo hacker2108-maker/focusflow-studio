@@ -1,7 +1,7 @@
 import { ReactNode, useCallback, useRef, useState, type PointerEvent } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence, PanInfo } from "framer-motion";
-import { Home, Target, Timer, BookOpen, CalendarDays, BarChart3, Settings, MapPin, StickyNote, Navigation, Github } from "lucide-react";
+import { Home, Target, Timer, BookOpen, CalendarDays, BarChart3, Settings, MapPin, StickyNote, Navigation, Github, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -12,6 +12,7 @@ const navItems = [
   { to: "/activity", icon: MapPin, label: "Activity" },
   { to: "/navigate", icon: Navigation, label: "Navigate" },
   { to: "/notes", icon: StickyNote, label: "Notes" },
+  { to: "/stitch", icon: Sparkles, label: "Stitch" },
   { to: "/journal", icon: BookOpen, label: "Journal" },
   { to: "/calendar", icon: CalendarDays, label: "Calendar" },
   { to: "/insights", icon: BarChart3, label: "Insights" },

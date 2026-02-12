@@ -9,6 +9,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { PageLoader } from "@/components/PageLoader";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Habits = lazy(() => import("./pages/Habits"));
@@ -23,6 +24,7 @@ const GitHub = lazy(() => import("./pages/GitHub"));
 const GitHubRepo = lazy(() => import("./pages/GitHubRepo"));
 const Navigate = lazy(() => import("./pages/Navigate"));
 const Notes = lazy(() => import("./pages/Notes"));
+const Stitch = lazy(() => import("./pages/Stitch"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -69,6 +71,7 @@ const App = () => {
                       <Route path="/github/repo/:owner/:name" element={<Suspense fallback={<PageLoader />}><GitHubRepo /></Suspense>} />
                       <Route path="/navigate" element={<Suspense fallback={<PageLoader />}><Navigate /></Suspense>} />
                       <Route path="/notes" element={<Suspense fallback={<PageLoader />}><Notes /></Suspense>} />
+                      <Route path="/stitch" element={<ErrorBoundary><Suspense fallback={<PageLoader />}><Stitch /></Suspense></ErrorBoundary>} />
                       <Route path="/insights" element={<Suspense fallback={<PageLoader />}><Insights /></Suspense>} />
                       <Route path="/profile" element={<Suspense fallback={<PageLoader />}><Profile /></Suspense>} />
                       <Route path="/settings" element={<Suspense fallback={<PageLoader />}><Settings /></Suspense>} />
