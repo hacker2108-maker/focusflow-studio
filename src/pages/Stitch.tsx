@@ -1446,7 +1446,96 @@ export default function Stitch() {
                       className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-xs"
                     />
                   </div>
-                  <div className="space-y-2">
+                  {/* Visual style */}
+                  {selected.type !== "line" && selected.type !== "arrow" && (
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-medium text-muted-foreground">Fill</label>
+                      <div className="flex items-center gap-2 text-xs">
+                        <div
+                          className="h-5 w-8 rounded border border-border"
+                          style={{ backgroundColor: selected.fill || DEFAULT_FILL }}
+                        />
+                        <input
+                          type="color"
+                          value={
+                            selected.fill && selected.fill.startsWith("#")
+                              ? selected.fill
+                              : "#4f46e5"
+                          }
+                          onChange={(e) =>
+                            setElements((prev) =>
+                              prev.map((el) =>
+                                el.id === selectedId ? { ...el, fill: e.target.value } : el
+                              )
+                            )
+                          }
+                          className="h-7 w-10 cursor-pointer border border-border rounded bg-background"
+                        />
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="outline" size="xs" className="h-7 px-2">
+                              Presets
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setElements((prev) =>
+                                  prev.map((el) =>
+                                    el.id === selectedId
+                                      ? { ...el, fill: "hsl(var(--primary) / 0.12)" }
+                                      : el
+                                  )
+                                )
+                              }
+                            >
+                              Primary surface
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setElements((prev) =>
+                                  prev.map((el) =>
+                                    el.id === selectedId
+                                      ? { ...el, fill: "hsl(var(--card))" }
+                                      : el
+                                  )
+                                )
+                              }
+                            >
+                              Card surface
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setElements((prev) =>
+                                  prev.map((el) =>
+                                    el.id === selectedId
+                                      ? { ...el, fill: "hsl(var(--muted))" }
+                                      : el
+                                  )
+                                )
+                              }
+                            >
+                              Muted background
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={() =>
+                                setElements((prev) =>
+                                  prev.map((el) =>
+                                    el.id === selectedId
+                                      ? { ...el, fill: "hsl(var(--foreground) / 0.06)" }
+                                      : el
+                                  )
+                                )
+                              }
+                            >
+                              Soft footer
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-2 mt-2">
                     <label className="text-[11px] font-medium text-muted-foreground">Position</label>
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
