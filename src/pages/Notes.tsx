@@ -23,6 +23,8 @@ import {
   Lightbulb,
   Archive,
   FileStack,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -95,7 +97,10 @@ export default function Notes() {
   const [showFolderDialog, setShowFolderDialog] = useState(false);
   const [newFolderName, setNewFolderName] = useState("");
   const [showFolderSidebar, setShowFolderSidebar] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const titleRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<InstanceType<typeof window.SpeechRecognition> | null>(null);
+  const contentRef = useRef("");
 
   useEffect(() => {
     fetchNotes();
@@ -114,6 +119,11 @@ export default function Notes() {
       setIsEditing(false);
     }
   }, [selectedNote?.id]);
+
+  // Keep content ref in sync for voice input so we always append to latest text
+  useEffect(() => {
+    contentRef.current = editContent;
+  }, [editContent]);
 
   // Auto-save with debounce
   useEffect(() => {
@@ -202,6 +212,128 @@ export default function Notes() {
     }
   };
 
+  // Voice-to-text: Web Speech API (Chrome, Edge, Safari)
+  const isSpeechRecognitionSupported =
+    typeof window !== "undefined" &&
+    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+
+  const toggleVoiceInput = () => {
+    const Win = window as unknown as {
+      SpeechRecognition?: new () => SpeechRecognition;
+      webkitSpeechRecognition?: new () => SpeechRecognition;
+    };
+    const SpeechRecognitionAPI = Win.SpeechRecognition || Win.webkitSpeechRecognition;
+
+    if (!SpeechRecognitionAPI) {
+      toast.error("Voice input is not supported in this browser. Try Chrome or Edge.");
+      return;
+    }
+
+    if (isListening) {
+      try {
+        recognitionRef.current?.abort();
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null;
+      setIsListening(false);
+      return;
+    }
+
+    const recognition = new SpeechRecognitionAPI();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = document.documentElement.lang || "en-US";
+    recognition.maxAlternatives = 1;
+
+    const onResult = (event: SpeechRecognitionEvent) => {
+      if (!event.results || event.results.length === 0) return;
+      const results = event.results;
+      let toAppend = "";
+      for (let i = event.resultIndex; i < results.length; i++) {
+        const result = results[i];
+        if (!result.isFinal) continue;
+        if (result.length > 0 && result[0].transcript) {
+          toAppend += (toAppend ? " " : "") + result[0].transcript;
+        }
+      }
+      if (toAppend) {
+        const current = contentRef.current ?? "";
+        const newContent = current.trimEnd() ? current + " " + toAppend.trim() : toAppend.trim();
+        contentRef.current = newContent;
+        setEditContent(newContent);
+      }
+    };
+
+    const onError = (event: SpeechRecognitionErrorEvent) => {
+      if (event.error === "not-allowed") {
+        toast.error("Microphone access denied. Allow mic access to use voice notes.");
+      } else if (event.error === "no-speech") {
+        toast.info("No speech heard. Try again or check your microphone.");
+      } else if (event.error !== "aborted") {
+        toast.error("Voice input error: " + (event.error || "Try again."));
+      }
+      setIsListening(false);
+      recognitionRef.current = null;
+    };
+
+    const onEnd = () => {
+      if (recognitionRef.current === recognition) {
+        setIsListening(false);
+        recognitionRef.current = null;
+      }
+    };
+
+    recognition.addEventListener("result", onResult);
+    recognition.addEventListener("error", onError);
+    recognition.addEventListener("end", onEnd);
+
+    const startListening = () => {
+      try {
+        recognition.start();
+        recognitionRef.current = recognition;
+        setIsListening(true);
+        toast.success("Listening… Speak now to add to your note.");
+      } catch (err) {
+        recognition.removeEventListener("result", onResult);
+        recognition.removeEventListener("error", onError);
+        recognition.removeEventListener("end", onEnd);
+        toast.error("Could not start microphone. Allow mic access and try again.");
+        setIsListening(false);
+      }
+    };
+
+    // Request mic permission first so the prompt appears and recognition is more reliable
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      navigator.mediaDevices
+        .getUserMedia({ audio: true })
+        .then((stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+          startListening();
+        })
+        .catch(() => {
+          toast.error("Microphone access is required for voice notes. Please allow and try again.");
+        });
+    } else {
+      startListening();
+    }
+  };
+
+  // Cleanup voice recognition on unmount or when leaving editor
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch {
+          // ignore
+        }
+        recognitionRef.current = null;
+      }
+      setIsListening(false);
+    };
+  }, []);
+
   // Filter notes by folder and search
   const filteredNotes = notes.filter((note) => {
     const matchesFolder = !selectedFolder || note.folder === selectedFolder;
@@ -234,15 +366,15 @@ export default function Notes() {
             animate={{ x: 0 }}
             exit={{ x: "100%" }}
             transition={{ type: "spring", damping: 25, stiffness: 200 }}
-            className="fixed inset-0 bg-background z-50 md:relative md:z-auto pb-[max(env(safe-area-inset-bottom),20px)]"
+            className="fixed inset-0 z-50 md:left-64 md:pt-0 flex flex-col bg-background pb-[max(env(safe-area-inset-bottom),20px)]"
             style={{
               backgroundColor:
                 selectedNote.color === "#FFFFFF" ? undefined : selectedNote.color,
             }}
           >
             {/* Editor Header */}
-            <div className="sticky top-0 z-10 glass-strong border-b border-border/50 px-4 py-3 pt-[max(env(safe-area-inset-top),12px)]">
-              <div className="flex items-center justify-between">
+            <div className="flex-shrink-0 sticky top-0 z-10 glass-strong border-b border-border/50 px-4 py-3 pt-[max(env(safe-area-inset-top),12px)] md:pt-4">
+              <div className="flex items-center justify-between max-w-4xl mx-auto">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -274,6 +406,29 @@ export default function Notes() {
                       ))}
                     </DropdownMenuContent>
                   </DropdownMenu>
+
+                  {/* Voice input */}
+                  {isSpeechRecognitionSupported && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={toggleVoiceInput}
+                      className={cn(
+                        "relative",
+                        isListening && "bg-destructive/10 text-destructive hover:bg-destructive/20"
+                      )}
+                      title={isListening ? "Stop voice input" : "Take notes by voice"}
+                    >
+                      {isListening ? (
+                        <MicOff className="w-4 h-4" />
+                      ) : (
+                        <Mic className="w-4 h-4" />
+                      )}
+                      {isListening && (
+                        <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                      )}
+                    </Button>
+                  )}
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -348,35 +503,35 @@ export default function Notes() {
               </div>
             </div>
 
-            {/* Editor Content */}
-            <div className="p-4 space-y-4">
-              <Input
-                ref={titleRef}
-                value={editTitle}
-                onChange={(e) => setEditTitle(e.target.value)}
-                placeholder="Title"
-                className="text-xl font-semibold border-none bg-transparent p-0 h-auto focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none shadow-none placeholder:text-muted-foreground/50"
-              />
+            {/* Document-style content: readable width, no cramped “circle” feel */}
+            <div className="flex-1 overflow-y-auto">
+              <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 md:py-8">
+                <Input
+                  ref={titleRef}
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="Title"
+                  className="text-2xl md:text-3xl font-semibold border-none bg-transparent p-0 h-auto min-h-[2.5rem] focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none shadow-none rounded-none placeholder:text-muted-foreground/50 w-full"
+                />
 
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3" />
-                  <span>
+                <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                  <span className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5" />
                     {formatDistanceToNow(selectedNote.updatedAt, { addSuffix: true })}
                   </span>
+                  <span className="flex items-center gap-1.5">
+                    <Folder className="w-3.5 h-3.5" />
+                    {selectedNote.folder}
+                  </span>
                 </div>
-                <div className="flex items-center gap-1">
-                  <Folder className="w-3 h-3" />
-                  <span>{selectedNote.folder}</span>
-                </div>
-              </div>
 
-              <Textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                placeholder="Start typing..."
-                className="min-h-[60vh] border-none bg-transparent p-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none shadow-none text-base leading-relaxed placeholder:text-muted-foreground/50"
-              />
+                <Textarea
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  placeholder="Start typing..."
+                  className="mt-6 min-h-[50vh] md:min-h-[60vh] w-full border-none bg-transparent p-0 resize-none focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none outline-none shadow-none rounded-none text-base md:text-[17px] leading-[1.6] placeholder:text-muted-foreground/50"
+                />
+              </div>
             </div>
           </motion.div>
         ) : (

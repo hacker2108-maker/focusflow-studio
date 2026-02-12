@@ -123,6 +123,10 @@ class VoiceNavigation {
   constructor() {
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       this.synthesis = window.speechSynthesis;
+      // Chrome: trigger voice list load so getVoices() is populated
+      if (this.synthesis.getVoices().length === 0) {
+        this.synthesis.addEventListener("voiceschanged", () => {}, { once: true });
+      }
     }
   }
 
@@ -139,26 +143,25 @@ class VoiceNavigation {
 
   speak(text: string, force: boolean = false) {
     if (!this.synthesis || !this.enabled) return;
-    
+    if (!text || String(text).trim() === "") return;
+
     // Don't repeat the same instruction unless forced
     if (text === this.lastSpokenInstruction && !force) return;
     this.lastSpokenInstruction = text;
 
-    // Cancel any ongoing speech
+    // Cancel any ongoing speech so the new one is clear
     this.synthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.0;
+    utterance.rate = 0.95;
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
     utterance.lang = "en-US";
 
-    // Try to use a natural voice
     const voices = this.synthesis.getVoices();
-    const preferredVoice = voices.find(v => 
+    const preferredVoice = voices.find(v =>
       v.lang.startsWith("en") && (v.name.includes("Natural") || v.name.includes("Enhanced"))
-    ) || voices.find(v => v.lang.startsWith("en"));
-    
+    ) || voices.find(v => v.lang.startsWith("en")) || voices[0];
     if (preferredVoice) {
       utterance.voice = preferredVoice;
     }
@@ -271,6 +274,7 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
   const [livePosition, setLivePosition] = useState<{ lat: number; lng: number } | null>(null);
   const [distanceToNextStep, setDistanceToNextStep] = useState<number | null>(null);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [autoFollow, setAutoFollow] = useState(true);
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -329,6 +333,9 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
     // Initial size fix after container is laid out
     requestAnimationFrame(() => map.invalidateSize());
 
+    const onDragStart = () => setAutoFollow(false);
+    map.on("dragstart", onDragStart);
+
     // ResizeObserver: fix white gap when container resizes (sidebar, orientation)
     const ro = mapContainerRef.current && new ResizeObserver(onMapResize);
     if (ro) ro.observe(mapContainerRef.current);
@@ -339,6 +346,7 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
       ro?.disconnect();
       map.off("zoomend", onMapResize);
       map.off("moveend", onMapResize);
+      map.off("dragstart", onDragStart);
       map.remove();
       mapRef.current = null;
     };
@@ -366,8 +374,10 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
           // Update marker position
           if (mapRef.current && originMarkerRef.current) {
             originMarkerRef.current.setLatLng([newPos.lat, newPos.lng]);
-            // Keep map centered on user during navigation
-            mapRef.current.setView([newPos.lat, newPos.lng], mapRef.current.getZoom());
+            // Keep map centered on user during navigation (while auto-follow is enabled)
+            if (autoFollow) {
+              mapRef.current.setView([newPos.lat, newPos.lng], mapRef.current.getZoom());
+            }
           }
         },
         (error) => {
@@ -387,7 +397,7 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
         gpsWatchRef.current = null;
       }
     };
-  }, [isNavigating, route]);
+  }, [isNavigating, route, autoFollow]);
 
   // Auto-advance steps based on GPS position
   useEffect(() => {
@@ -507,28 +517,65 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
     }
   }, [route]);
 
-  // Search for addresses
-  const searchAddress = useCallback(async (query: string) => {
-    if (query.length < 3) {
+  // Normalize US-style address for better geocoding (e.g. "32 nd" -> "32nd", "sw" -> "SW")
+  const normalizeAddressQuery = useCallback((q: string): string => {
+    return q
+      .trim()
+      // Drop apartment / unit numbers which Nominatim often can't match
+      // e.g. "APT 405", "Apartment 12", "Unit 3B", "Suite 200", "#405"
+      .replace(/\b(apt|apartment|unit|suite|ste|#)\s*\w+\b/gi, "")
+      // Collapse ordinals like "32 nd" -> "32nd"
+      .replace(/\b(\d+)\s+(nd|st|rd|th)\b/gi, "$1$2")
+      // Normalize cardinal directions
+      .replace(/\b(n|s|e|w|ne|nw|se|sw)\b/gi, (m) => m.toUpperCase())
+      // Normalize common street-type abbreviations (keep abbreviation but normalize casing)
+      .replace(/\b(ave|blvd|dr|ln|ct|pl|rd|st|hwy|pkwy|trl)\b/gi, (m) => m.charAt(0).toUpperCase() + m.slice(1).toLowerCase())
+      // Remove extra commas/spaces
+      .replace(/,+/g, ",")
+      .replace(/\s+,/g, ",")
+      .replace(/,\s+/g, ", ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }, []);
+
+  // Search for addresses (global search so full addresses like "4500 sw 32 nd ave westpark florida" work)
+  const searchAddress = useCallback(async (query: string): Promise<SearchResult[] | null> => {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
       setSearchResults([]);
-      return;
+      return null;
     }
 
     setIsSearching(true);
     try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`,
-        { headers: { "Accept-Language": "en" } }
-      );
-      const data = await response.json();
+      const normalized = normalizeAddressQuery(trimmed);
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        normalized
+      )}&limit=15&addressdetails=1`;
+
+      const response = await fetch(url, {
+        headers: {
+          "Accept-Language": "en",
+        },
+      });
+      const data: SearchResult[] = await response.json();
+
+      if (!Array.isArray(data) || data.length === 0) {
+        setSearchResults([]);
+        toast.error("No places found. Try the full address with city and state.");
+        return null;
+      }
+
       setSearchResults(data);
+      return data;
     } catch (error) {
       console.error("Search error:", error);
-      toast.error("Failed to search for address");
+      toast.error("Failed to search for places. Check your internet connection.");
+      return null;
     } finally {
       setIsSearching(false);
     }
-  }, []);
+  }, [normalizeAddressQuery]);
 
   // Debounced search
   useEffect(() => {
@@ -536,7 +583,7 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
       clearTimeout(searchTimeoutRef.current);
     }
 
-    if (destination.length >= 3 && !selectedDestination) {
+    if (destination.length >= 3) {
       searchTimeoutRef.current = setTimeout(() => {
         searchAddress(destination);
       }, 500);
@@ -626,27 +673,37 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
   const handleStartNavigation = () => {
     if (!route) return;
     setIsNavigating(true);
+    setAutoFollow(true);
     setCurrentStepIndex(0);
-    setShowDirections(true);
+    // Start with a compact UI like Google Maps; user can expand details if needed
+    setShowDirections(false);
     setLivePosition(currentPosition);
     lastAnnouncedDistanceRef.current = Infinity;
     
-    // Announce start
+    // Announce start (runs in same user gesture so browser allows speech)
     voiceNavRef.current.announceStart(route.distance, route.duration);
-    
-    // After a delay, announce first step
+
+    // Announce first step soon so it's still in user-gesture context (fixes muted voice on some browsers)
+    const steps = route.steps;
+    const startPos = currentPosition;
     setTimeout(() => {
-      if (route.steps[0] && currentPosition) {
+      if (steps[0] && startPos) {
         const firstStepDist = calculateDistanceMeters(
-          currentPosition.lat,
-          currentPosition.lng,
-          route.steps[0].location[1],
-          route.steps[0].location[0]
+          startPos.lat,
+          startPos.lng,
+          steps[0].location[1],
+          steps[0].location[0]
         );
-        voiceNavRef.current.announceStep(route.steps[0], firstStepDist);
+        voiceNavRef.current.announceStep(steps[0], firstStepDist);
       }
-    }, 3000);
+    }, 600);
     
+    // Zoom to the whole route like Google Maps when you tap Start
+    if (mapRef.current && route.coordinates.length > 0) {
+      const bounds = L.latLngBounds(route.coordinates);
+      mapRef.current.fitBounds(bounds, { padding: [80, 80] });
+    }
+
     toast.success("Navigation started!");
   };
 
@@ -661,6 +718,7 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
   const handleCenterOnUser = () => {
     const pos = livePosition || currentPosition;
     if (pos && mapRef.current) {
+      setAutoFollow(true);
       mapRef.current.setView([pos.lat, pos.lng], 16);
     } else {
       toast.error("Location not available");
@@ -719,10 +777,23 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
               placeholder="Search for a place or address"
               value={destination}
               onChange={(e) => {
-                setDestination(e.target.value);
+                const value = e.target.value;
+                setDestination(value);
+                setSearchResults([]);
                 if (selectedDestination) {
                   setSelectedDestination(null);
                   setRoute(null);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  // Immediate search on Enter; if we get exactly one result, auto-select it
+                  searchAddress(destination).then((results) => {
+                    if (results && results.length === 1) {
+                      handleSelectResult(results[0]);
+                    }
+                  });
                 }
               }}
               className="pl-12 pr-12 h-12 bg-transparent border-0 rounded-full text-base placeholder:text-[#5f6368] focus-visible:ring-0 focus-visible:ring-offset-0"
@@ -923,50 +994,26 @@ export function InAppNavigation({ currentPosition, fullScreen = false }: InAppNa
         )}
       </AnimatePresence>
 
-      {/* Current navigation step overlay - Google Maps style */}
+      {/* Minimal next-turn strip - like Google Maps (no big card) */}
       <AnimatePresence>
         {isNavigating && route && route.steps[currentStepIndex] && (
           <motion.div
-            initial={{ opacity: 0, y: -20 }}
+            initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+            exit={{ opacity: 0, y: -8 }}
             className="absolute top-20 left-4 right-4 z-[1000]"
           >
-            <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-4">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[#E8F0FE] flex items-center justify-center text-[#4285F4]">
-                  {getManeuverIcon(route.steps[currentStepIndex].maneuver)}
-                </div>
-                <div className="flex-1">
-                  <p className="font-semibold text-gray-900">{route.steps[currentStepIndex].instruction}</p>
-                  <p className="text-sm text-[#5f6368]">
-                    {distanceToNextStep !== null 
-                      ? `${formatDistance(distanceToNextStep)} away`
-                      : formatDistance(route.steps[currentStepIndex].distance)
-                    }
-                  </p>
-                </div>
+            <div className="flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full shadow-md border border-gray-200/80 py-2 pl-3 pr-4 min-w-0">
+              <div className="w-8 h-8 rounded-full bg-[#E8F0FE] flex items-center justify-center text-[#4285F4] flex-shrink-0">
+                {getManeuverIcon(route.steps[currentStepIndex].maneuver)}
               </div>
-              
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
-                <span className="text-sm text-[#5f6368]">
-                  Step {currentStepIndex + 1} of {route.steps.length}
-                </span>
-                <div className="flex gap-1">
-                  {route.steps.map((_, idx) => (
-                    <div
-                      key={idx}
-                      className={cn(
-                        "w-2 h-2 rounded-full",
-                        idx === currentStepIndex
-                          ? "bg-[#4285F4]"
-                          : idx < currentStepIndex
-                          ? "bg-[#4285F4]/50"
-                          : "bg-gray-200"
-                      )}
-                    />
-                  ))}
-                </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{route.steps[currentStepIndex].instruction}</p>
+                <p className="text-xs text-[#5f6368]">
+                  {distanceToNextStep !== null
+                    ? `${formatDistance(distanceToNextStep)} away`
+                    : formatDistance(route.steps[currentStepIndex].distance)}
+                </p>
               </div>
             </div>
           </motion.div>

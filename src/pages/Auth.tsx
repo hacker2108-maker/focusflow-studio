@@ -102,7 +102,7 @@ export default function Auth() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl gradient-primary shadow-glow mb-4">
             <Target className="w-8 h-8 text-primary-foreground" />
           </div>
-          <h1 className="text-display-sm text-gradient">FocusHabit</h1>
+          <h1 className="text-display-sm font-extrabold text-foreground">FocusHabit</h1>
           <p className="text-muted-foreground mt-2">Build better habits, stay focused</p>
         </div>
 
