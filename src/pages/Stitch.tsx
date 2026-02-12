@@ -23,6 +23,7 @@ import {
   ArrowLeft,
   Star,
   X,
+  LayoutGrid,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -37,7 +38,7 @@ import { toast } from "sonner";
 
 type Tool = "select" | "rect" | "circle" | "text" | "line" | "arrow" | "star" | "hand";
 
-type SectionKind = "nav" | "hero" | "features" | "featureCard" | "cta" | "footer" | "sidebar" | "header" | "content" | "tabBar" | "form" | "logo" | "input" | "button" | null;
+type SectionKind = "nav" | "hero" | "features" | "featureCard" | "stats" | "pricing" | "pricingCard" | "cta" | "footer" | "sidebar" | "header" | "content" | "tabBar" | "form" | "logo" | "input" | "button" | "faq" | "newsletter" | null;
 
 interface CanvasElement {
   id: string;
@@ -104,29 +105,82 @@ function landingCopy(theme: string) {
     { title: "Fast", desc: "Built for speed and reliability." },
     { title: "Support", desc: "We're here when you need us." },
   ];
+  const testimonial = theme === "Landing Page" ? "“This changed how we work.” — Alex, Team Lead" : `“Best ${brand.toLowerCase()} experience.” — Happy customer`;
   const footer = "© 2025 " + brand + "    Privacy    Terms    Contact";
-  return { nav, hero: h, features, ctaHeadline: "Ready to get started?", ctaButton: h.cta, footer };
+  const stats = [
+    { value: "10K+", label: "Active users" },
+    { value: "99.9%", label: "Uptime" },
+    { value: "24/7", label: "Support" },
+  ];
+  const pricing = [
+    { name: "Starter", price: "$9", period: "/month", cta: "Start free" },
+    { name: "Pro", price: "$29", period: "/month", cta: "Get started" },
+    { name: "Team", price: "$99", period: "/month", cta: "Contact sales" },
+  ];
+  const faq = [
+    { q: "How do I get started?", a: "Sign up in under a minute. No credit card required." },
+    { q: "Can I change plans later?", a: "Yes. Upgrade or downgrade anytime from your account." },
+  ];
+  const newsletter = { headline: "Stay in the loop", subline: "Get tips and updates. No spam.", cta: "Subscribe" };
+  return { nav, hero: h, features, stats, pricing, faq, testimonial, newsletter, ctaHeadline: "Ready to get started?", ctaButton: h.cta, footer };
 }
 
-/** Full landing page layout with real content */
+/** Full real landing page: nav, hero, stats, features, testimonial, pricing, CTA, FAQ, newsletter, footer */
 function generateLandingLayout(theme: string): Omit<CanvasElement, "id">[] {
   const w = 1280;
-  const h = 800;
+  const h = 1620;
   const pad = 0;
+  const gap = 24;
   const cx = -w / 2;
   const cy = -h / 2;
   const copy = landingCopy(theme);
   const fw = (w - 32 * 4) / 3;
-  return [
+  const pw = (w - 32 * 4) / 3;
+  let y = cy + 56 + 340 + gap; // after nav + hero
+  const out: Omit<CanvasElement, "id">[] = [
     { type: "frame", x: cx, y: cy, width: w, height: h, fill: "hsl(var(--card))", label: theme, sectionKind: null },
     { type: "rect", x: cx + pad, y: cy + pad, width: w - pad * 2, height: 56, fill: "hsl(var(--foreground) / 0.08)", label: "Nav", sectionKind: "nav", content: copy.nav },
-    { type: "rect", x: cx + pad, y: cy + 56 + pad, width: w - pad * 2, height: 380, fill: "hsl(var(--primary) / 0.12)", label: "Hero", sectionKind: "hero", content: copy.hero.headline, subline: copy.hero.subline, ctaText: copy.hero.cta },
-    { type: "rect", x: cx + 32, y: cy + 56 + 380 + 32, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[0].title, sectionKind: "featureCard", content: copy.features[0].title, subline: copy.features[0].desc },
-    { type: "rect", x: cx + 32 + fw + 32, y: cy + 56 + 380 + 32, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[1].title, sectionKind: "featureCard", content: copy.features[1].title, subline: copy.features[1].desc },
-    { type: "rect", x: cx + 32 + (fw + 32) * 2, y: cy + 56 + 380 + 32, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[2].title, sectionKind: "featureCard", content: copy.features[2].title, subline: copy.features[2].desc },
-    { type: "rect", x: cx + pad, y: cy + 56 + 380 + 32 + 180 + 32, width: w - pad * 2, height: 140, fill: "hsl(var(--primary) / 0.2)", label: "CTA", sectionKind: "cta", content: copy.ctaHeadline, ctaText: copy.ctaButton },
-    { type: "rect", x: cx + pad, y: cy + h - 80 - pad, width: w - pad * 2, height: 80, fill: "hsl(var(--foreground) / 0.06)", label: "Footer", sectionKind: "footer", content: copy.footer },
+    { type: "rect", x: cx + pad, y: cy + 56, width: w - pad * 2, height: 340, fill: "hsl(var(--primary) / 0.12)", label: "Hero", sectionKind: "hero", content: copy.hero.headline, subline: copy.hero.subline, ctaText: copy.hero.cta },
   ];
+  out.push(
+    { type: "rect", x: cx + 32, y: y, width: fw, height: 100, fill: "hsl(var(--card))", label: "Stats", sectionKind: "stats", content: copy.stats[0].value, subline: copy.stats[0].label },
+    { type: "rect", x: cx + 32 + fw + 32, y: y, width: fw, height: 100, fill: "hsl(var(--card))", label: "Stats", sectionKind: "stats", content: copy.stats[1].value, subline: copy.stats[1].label },
+    { type: "rect", x: cx + 32 + (fw + 32) * 2, y: y, width: fw, height: 100, fill: "hsl(var(--card))", label: "Stats", sectionKind: "stats", content: copy.stats[2].value, subline: copy.stats[2].label }
+  );
+  y += 100 + gap;
+  out.push(
+    { type: "rect", x: cx + 32, y, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[0].title, sectionKind: "featureCard", content: copy.features[0].title, subline: copy.features[0].desc },
+    { type: "rect", x: cx + 32 + fw + 32, y, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[1].title, sectionKind: "featureCard", content: copy.features[1].title, subline: copy.features[1].desc },
+    { type: "rect", x: cx + 32 + (fw + 32) * 2, y, width: fw, height: 180, fill: "hsl(var(--card))", label: copy.features[2].title, sectionKind: "featureCard", content: copy.features[2].title, subline: copy.features[2].desc }
+  );
+  y += 180 + gap;
+  out.push(
+    { type: "rect", x: cx + pad, y, width: w - pad * 2, height: 72, fill: "hsl(var(--muted))", label: "Testimonial", sectionKind: "content", content: copy.testimonial }
+  );
+  y += 72 + gap;
+  out.push(
+    { type: "rect", x: cx + 32, y, width: pw, height: 220, fill: "hsl(var(--card))", label: copy.pricing[0].name, sectionKind: "pricingCard", content: copy.pricing[0].name, subline: copy.pricing[0].price + " " + copy.pricing[0].period, ctaText: copy.pricing[0].cta },
+    { type: "rect", x: cx + 32 + pw + 32, y, width: pw, height: 220, fill: "hsl(var(--primary) / 0.08)", label: copy.pricing[1].name, sectionKind: "pricingCard", content: copy.pricing[1].name, subline: copy.pricing[1].price + " " + copy.pricing[1].period, ctaText: copy.pricing[1].cta },
+    { type: "rect", x: cx + 32 + (pw + 32) * 2, y, width: pw, height: 220, fill: "hsl(var(--card))", label: copy.pricing[2].name, sectionKind: "pricingCard", content: copy.pricing[2].name, subline: copy.pricing[2].price + " " + copy.pricing[2].period, ctaText: copy.pricing[2].cta }
+  );
+  y += 220 + gap;
+  out.push(
+    { type: "rect", x: cx + pad, y, width: w - pad * 2, height: 100, fill: "hsl(var(--primary) / 0.2)", label: "CTA", sectionKind: "cta", content: copy.ctaHeadline, ctaText: copy.ctaButton }
+  );
+  y += 100 + gap;
+  out.push(
+    { type: "rect", x: cx + pad, y, width: (w - pad * 2 - gap) / 2, height: 100, fill: "hsl(var(--muted))", label: "FAQ", sectionKind: "faq", content: copy.faq[0].q, subline: copy.faq[0].a },
+    { type: "rect", x: cx + pad + (w - pad * 2 - gap) / 2 + gap, y, width: (w - pad * 2 - gap) / 2, height: 100, fill: "hsl(var(--muted))", label: "FAQ", sectionKind: "faq", content: copy.faq[1].q, subline: copy.faq[1].a }
+  );
+  y += 100 + gap;
+  out.push(
+    { type: "rect", x: cx + pad, y, width: w - pad * 2, height: 120, fill: "hsl(var(--foreground) / 0.04)", label: "Newsletter", sectionKind: "newsletter", content: copy.newsletter.headline, subline: copy.newsletter.subline, ctaText: copy.newsletter.cta }
+  );
+  y += 120 + gap;
+  out.push(
+    { type: "rect", x: cx + pad, y, width: w - pad * 2, height: 80, fill: "hsl(var(--foreground) / 0.06)", label: "Footer", sectionKind: "footer", content: copy.footer }
+  );
+  return out;
 }
 
 /** Mobile app screen with content */
@@ -417,6 +471,70 @@ export default function Stitch() {
     toast.success(`${preset.name} added`);
   };
 
+  /** Get Y position below all elements (for adding new sections) */
+  const getNextSectionY = useCallback(() => {
+    if (elements.length === 0) return -360;
+    return Math.max(...elements.map((e) => e.y + e.height)) + 24;
+  }, [elements]);
+
+  /** Add a real page section (Hero, Stats, Features, etc.) — user builds real pages */
+  const addPageSection = useCallback(
+    (kind: SectionKind & string) => {
+      const W = 800;
+      const cx = -W / 2;
+      const y = getNextSectionY();
+      const gap = 16;
+      const newEls: CanvasElement[] = [];
+      const mk = (partial: Omit<CanvasElement, "id">) => ({ ...partial, id: generateId() } as CanvasElement);
+
+      if (kind === "nav") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W, height: 56, fill: "hsl(var(--foreground) / 0.08)", label: "Nav", sectionKind: "nav", content: "Logo    Home    About    Contact" }));
+      } else if (kind === "hero") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W, height: 320, fill: "hsl(var(--primary) / 0.12)", label: "Hero", sectionKind: "hero", content: "Your headline here", subline: "Supporting copy and value proposition.", ctaText: "Get started" }));
+      } else if (kind === "stats") {
+        const w = (W - gap * 2) / 3;
+        ["10K+", "99.9%", "24/7"].forEach((value, i) =>
+          newEls.push(mk({ type: "rect", x: cx + i * (w + gap), y, width: w, height: 100, fill: "hsl(var(--card))", label: "Stat", sectionKind: "stats", content: value, subline: i === 0 ? "Users" : i === 1 ? "Uptime" : "Support" }))
+        );
+      } else if (kind === "featureCard") {
+        const w = (W - gap * 2) / 3;
+        [
+          { t: "Feature one", d: "Short description." },
+          { t: "Feature two", d: "Short description." },
+          { t: "Feature three", d: "Short description." },
+        ].forEach((f, i) =>
+          newEls.push(mk({ type: "rect", x: cx + i * (w + gap), y, width: w, height: 160, fill: "hsl(var(--card))", label: f.t, sectionKind: "featureCard", content: f.t, subline: f.d }))
+        );
+      } else if (kind === "content") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W, height: 80, fill: "hsl(var(--muted))", label: "Testimonial", sectionKind: "content", content: ""Quote from a customer." — Name, Role" }));
+      } else if (kind === "pricingCard") {
+        const w = (W - gap * 2) / 3;
+        [
+          { name: "Starter", price: "$9/mo", cta: "Start free" },
+          { name: "Pro", price: "$29/mo", cta: "Get started" },
+          { name: "Team", price: "$99/mo", cta: "Contact" },
+        ].forEach((p, i) =>
+          newEls.push(mk({ type: "rect", x: cx + i * (w + gap), y, width: w, height: 200, fill: "hsl(var(--card))", label: p.name, sectionKind: "pricingCard", content: p.name, subline: p.price, ctaText: p.cta }))
+        );
+      } else if (kind === "cta") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W, height: 120, fill: "hsl(var(--primary) / 0.2)", label: "CTA", sectionKind: "cta", content: "Ready to get started?", ctaText: "Sign up free" }));
+      } else if (kind === "faq") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W / 2 - gap / 2, height: 90, fill: "hsl(var(--muted))", label: "FAQ", sectionKind: "faq", content: "How do I get started?", subline: "Sign up in under a minute. No credit card required." }));
+        newEls.push(mk({ type: "rect", x: cx + W / 2 + gap / 2, y, width: W / 2 - gap / 2, height: 90, fill: "hsl(var(--muted))", label: "FAQ", sectionKind: "faq", content: "Can I change plans?", subline: "Yes. Upgrade or downgrade anytime." }));
+      } else if (kind === "newsletter") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W, height: 120, fill: "hsl(var(--foreground) / 0.04)", label: "Newsletter", sectionKind: "newsletter", content: "Stay in the loop", subline: "Get tips and updates. No spam.", ctaText: "Subscribe" }));
+      } else if (kind === "footer") {
+        newEls.push(mk({ type: "rect", x: cx, y, width: W, height: 72, fill: "hsl(var(--foreground) / 0.06)", label: "Footer", sectionKind: "footer", content: "© 2025 Your Company    Privacy    Terms    Contact" }));
+      }
+      if (newEls.length > 0) {
+        setElements((prev) => [...prev, ...newEls]);
+        setSelectedId(newEls[newEls.length - 1].id);
+        toast.success(`Added ${kind} section`);
+      }
+    },
+    [getNextSectionY]
+  );
+
   // Keyboard: Delete/Backspace to remove selected
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -542,6 +660,224 @@ export default function Stitch() {
     link.click();
     URL.revokeObjectURL(link.href);
     toast.success("Exported as JSON");
+  };
+
+  /** Export as standalone HTML page — ready to post online (like Google Stitch) */
+  const exportToHTML = (els: CanvasElement[]) => {
+    const escape = (s: string) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    const frame = els.find((e) => e.type === "frame");
+    const title = escape((frame?.label as string) || "My Page");
+    const navEl = els.find((e) => e.sectionKind === "nav");
+    const heroEl = els.find((e) => e.sectionKind === "hero");
+    const featureEls = els.filter((e) => e.sectionKind === "featureCard").sort((a, b) => a.x - b.x);
+    const statsEls = els.filter((e) => e.sectionKind === "stats").sort((a, b) => a.x - b.x);
+    const pricingEls = els.filter((e) => e.sectionKind === "pricingCard").sort((a, b) => a.x - b.x);
+    const faqEls = els.filter((e) => e.sectionKind === "faq").sort((a, b) => a.y - b.y);
+    const newsletterEl = els.find((e) => e.sectionKind === "newsletter");
+    const ctaEl = els.find((e) => e.sectionKind === "cta");
+    const footerEl = els.find((e) => e.sectionKind === "footer");
+    const contentEl = els.find((e) => e.sectionKind === "content" && (e.content ?? "").trim().length > 0);
+    const logoEl = els.find((e) => e.sectionKind === "logo");
+    const inputEls = els.filter((e) => e.sectionKind === "input").sort((a, b) => a.y - b.y);
+    const buttonEl = els.find((e) => e.sectionKind === "button");
+    const isForm = logoEl || inputEls.length > 0 || buttonEl;
+
+    if (isForm) {
+      const formTitle = escape(logoEl?.content ?? logoEl?.label ?? title);
+      const inputsHtml = inputEls.map((inp) => `<label class="form-label">${escape(inp.content ?? inp.label ?? "")}</label><input type="${inp.label?.toLowerCase().includes("password") ? "password" : "text"}" class="form-input" placeholder="${escape(inp.content ?? "")}">`).join("");
+      const btnHtml = buttonEl ? `<button type="submit" class="btn btn-primary btn-block">${escape(buttonEl.ctaText ?? buttonEl.content ?? buttonEl.label ?? "Submit")}</button>` : "";
+      return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="${formTitle}">
+  <title>${formTitle}</title>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;} body{margin:0;font-family:system-ui,sans-serif;background:linear-gradient(180deg,#f0f4ff 0%,#e8eeff 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;color:#1a1a1a;}
+    .form-card{background:#fff;padding:40px;border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.08);max-width:400px;width:100%;}
+    .form-logo{font-size:24px;font-weight:700;text-align:center;margin-bottom:28px;}
+    .form-label{display:block;font-size:13px;font-weight:500;color:#374151;margin-bottom:6px;}
+    .form-input{width:100%;padding:12px 14px;border:1px solid #e5e7eb;border-radius:8px;font-size:15px;margin-bottom:16px;}
+    .form-input:focus{outline:none;border-color:#4f46e5;box-shadow:0 0 0 3px rgba(79,70,229,0.15);}
+    .btn{display:inline-block;padding:12px 24px;border-radius:8px;font-weight:600;font-size:14px;text-decoration:none;border:none;cursor:pointer;transition:opacity 0.2s;}
+    .btn-primary{background:#4f46e5;color:#fff;width:100%;}
+    .btn-block{display:block;text-align:center;}
+  </style>
+</head>
+<body>
+  <div class="form-card">
+    <div class="form-logo">${formTitle}</div>
+    <form action="#" method="get">
+      ${inputsHtml}
+      ${btnHtml}
+    </form>
+  </div>
+</body>
+</html>`;
+    }
+
+    const navLinks = (navEl?.content ?? "")
+      .split(/\s{2,}|\t/)
+      .map((t) => t.trim())
+      .filter(Boolean);
+    const navHtml =
+      navLinks.length > 0
+        ? `<nav class="nav"><div class="container nav-inner">${navLinks.map((text, i) => (i === 0 ? `<strong class="logo">${escape(text)}</strong>` : `<a href="#">${escape(text)}</a>`)).join("")}</div></nav>`
+        : "";
+
+    const heroHtml =
+      heroEl ?
+        `<section class="hero"><div class="container"><h1>${escape(heroEl.content ?? "")}</h1><p class="hero-sub">${escape(heroEl.subline ?? "")}</p>${heroEl.ctaText ? `<a href="#" class="btn btn-primary">${escape(heroEl.ctaText)}</a>` : ""}</div></section>`
+      : "";
+
+    const featuresHtml =
+      featureEls.length > 0
+        ? `<section class="features"><div class="container grid">${featureEls.map((c) => `<div class="card"><h3>${escape(c.content ?? c.label ?? "")}</h3><p>${escape(c.subline ?? "")}</p></div>`).join("")}</div></section>`
+        : "";
+
+    const statsHtml =
+      statsEls.length > 0
+        ? `<section class="stats"><div class="container grid grid-3">${statsEls.map((s) => `<div class="stat"><span class="stat-value">${escape(s.content ?? "")}</span><span class="stat-label">${escape(s.subline ?? "")}</span></div>`).join("")}</div></section>`
+        : "";
+
+    const pricingHtml =
+      pricingEls.length > 0
+        ? `<section class="pricing"><div class="container"><h2 class="section-title">Plans & pricing</h2><div class="grid grid-3">${pricingEls.map((p) => `<div class="pricing-card"><h3>${escape(p.content ?? "")}</h3><p class="price">${escape(p.subline ?? "")}</p><a href="#" class="btn btn-primary">${escape(p.ctaText ?? "Get started")}</a></div>`).join("")}</div></div></section>`
+        : "";
+
+    const faqHtml =
+      faqEls.length > 0
+        ? `<section class="faq"><div class="container"><h2 class="section-title">FAQ</h2><div class="faq-list">${faqEls.map((f) => `<div class="faq-item"><h4>${escape(f.content ?? "")}</h4><p>${escape(f.subline ?? "")}</p></div>`).join("")}</div></div></section>`
+        : "";
+
+    const newsletterHtml =
+      newsletterEl
+        ? `<section class="newsletter"><div class="container"><h2>${escape(newsletterEl.content ?? "")}</h2><p class="newsletter-sub">${escape(newsletterEl.subline ?? "")}</p><form class="newsletter-form"><input type="email" placeholder="Your email" class="form-input"><button type="submit" class="btn btn-primary">${escape(newsletterEl.ctaText ?? "Subscribe")}</button></form></div></section>`
+        : "";
+
+    const contentHtml =
+      contentEl ?
+        `<section class="testimonial"><div class="container"><blockquote class="testimonial-quote">${escape(contentEl.content ?? "")}</blockquote></div></section>`
+      : "";
+
+    const ctaHtml =
+      ctaEl ?
+        `<section class="cta"><div class="container"><h2>${escape(ctaEl.content ?? "")}</h2>${ctaEl.ctaText ? `<a href="#" class="btn btn-primary">${escape(ctaEl.ctaText)}</a>` : ""}</div></section>`
+      : "";
+
+    const footerParts = (footerEl?.content ?? "").split(/\s{2,}|\t/).map((t) => t.trim()).filter(Boolean);
+    const footerHtml =
+      footerParts.length > 0
+        ? `<footer class="footer"><div class="container">${footerParts.map((t) => (t.startsWith("©") ? `<span>${escape(t)}</span>` : `<a href="#">${escape(t)}</a>`)).join(" &middot; ")}</div></footer>`
+        : "";
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="${title} — created with Stitch">
+  <title>${title}</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #1a1a1a; line-height: 1.5; background: #fafafa; }
+    .container { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+    .nav { background: #f0f0f0; border-bottom: 1px solid #e5e5e5; }
+    .nav-inner { display: flex; align-items: center; gap: 24px; min-height: 56px; }
+    .nav a { color: #374151; text-decoration: none; font-size: 14px; }
+    .nav a:hover { color: #111; }
+    .logo { font-size: 18px; color: #111; }
+    .hero { background: linear-gradient(180deg, #eef2ff 0%, #e0e7ff 100%); padding: 80px 0 100px; text-align: center; }
+    .hero h1 { font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin: 0 0 16px; letter-spacing: -0.02em; }
+    .hero-sub { font-size: 18px; color: #4b5563; max-width: 540px; margin: 0 auto 28px; }
+    .btn { display: inline-block; padding: 12px 24px; border-radius: 8px; font-weight: 600; font-size: 14px; text-decoration: none; transition: opacity 0.2s; }
+    .btn:hover { opacity: 0.9; }
+    .btn-primary { background: #4f46e5; color: #fff; }
+    .features { padding: 64px 0; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+    .card { background: #fff; padding: 28px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .card h3 { margin: 0 0 8px; font-size: 18px; }
+    .card p { margin: 0; font-size: 14px; color: #6b7280; }
+    .testimonial { padding: 48px 0; background: #f9fafb; }
+    .testimonial-quote { margin: 0; font-size: 18px; font-style: italic; color: #4b5563; text-align: center; max-width: 640px; margin: 0 auto; }
+    .stats { padding: 48px 0; background: #fff; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    @media (max-width: 768px) { .grid-3 { grid-template-columns: 1fr; } }
+    .stat { text-align: center; }
+    .stat-value { display: block; font-size: 28px; font-weight: 700; color: #4f46e5; }
+    .stat-label { font-size: 14px; color: #6b7280; }
+    .section-title { text-align: center; font-size: 24px; margin: 0 0 32px; }
+    .pricing { padding: 64px 0; background: #f9fafb; }
+    .pricing-card { background: #fff; padding: 32px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); text-align: center; }
+    .pricing-card h3 { margin: 0 0 8px; font-size: 18px; }
+    .pricing-card .price { font-size: 24px; font-weight: 700; margin: 0 0 16px; }
+    .faq { padding: 64px 0; background: #fff; }
+    .faq-list { max-width: 640px; margin: 0 auto; }
+    .faq-item { padding: 20px 0; border-bottom: 1px solid #e5e7eb; }
+    .faq-item h4 { margin: 0 0 8px; font-size: 16px; }
+    .faq-item p { margin: 0; font-size: 14px; color: #6b7280; }
+    .newsletter { padding: 64px 0; background: #f3f4f6; text-align: center; }
+    .newsletter h2 { margin: 0 0 8px; font-size: 22px; }
+    .newsletter-sub { margin: 0 0 20px; color: #6b7280; }
+    .newsletter-form { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; max-width: 400px; margin: 0 auto; }
+    .newsletter-form .form-input { flex: 1; min-width: 200px; padding: 12px 14px; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 15px; }
+    .cta { background: #e0e7ff; padding: 64px 0; text-align: center; }
+    .cta h2 { margin: 0 0 20px; font-size: 24px; font-weight: 600; }
+    .footer { background: #f3f4f6; padding: 24px 0; font-size: 13px; color: #6b7280; }
+    .footer .container { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: center; }
+    .footer a { color: #6b7280; text-decoration: none; }
+    .footer a:hover { color: #111; }
+  </style>
+</head>
+<body>
+  ${navHtml}
+  <main>
+    ${heroHtml}
+    ${statsHtml}
+    ${featuresHtml}
+    ${contentHtml}
+    ${pricingHtml}
+    ${ctaHtml}
+    ${faqHtml}
+    ${newsletterHtml}
+  </main>
+  ${footerHtml}
+</body>
+</html>`;
+  };
+
+  const handleExportHTML = () => {
+    const hasSections = elements.some((e) => e.sectionKind && e.type === "rect");
+    const hasForm = elements.some((e) => e.sectionKind === "logo" || e.sectionKind === "input" || e.sectionKind === "button");
+    if (elements.length === 0 || (!hasSections && !hasForm)) {
+      toast.error("Create a page first: use Design with AI (e.g. \"Landing page for a coffee shop\" or \"Signup form\"), then export HTML.");
+      return;
+    }
+    const html = exportToHTML(elements);
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const link = document.createElement("a");
+    link.download = "index.html";
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success("HTML downloaded. Open in a browser or upload to Netlify/Vercel/GitHub Pages to publish.");
+  };
+
+  const handleCopyHTML = async () => {
+    const hasSections = elements.some((e) => e.sectionKind && e.type === "rect");
+    const hasForm = elements.some((e) => e.sectionKind === "logo" || e.sectionKind === "input" || e.sectionKind === "button");
+    if (elements.length === 0 || (!hasSections && !hasForm)) {
+      toast.error("Create a page first with Design with AI, then copy HTML.");
+      return;
+    }
+    const html = exportToHTML(elements);
+    try {
+      await navigator.clipboard.writeText(html);
+      toast.success("HTML copied to clipboard. Paste into your host or a new file.");
+    } catch {
+      toast.error("Could not copy. Use Export as HTML to download instead.");
+    }
   };
 
   const handleAiGenerate = () => {
@@ -687,6 +1023,8 @@ export default function Stitch() {
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={handleExportPNG}>Export as PNG</DropdownMenuItem>
                 <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportHTML}>Export as HTML (download)</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleCopyHTML}>Copy HTML (paste to publish)</DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
             <Button
@@ -737,11 +1075,25 @@ export default function Stitch() {
                   ))}
                 </DropdownMenuContent>
               </DropdownMenu>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" title="Add page section">
+                    <LayoutGrid className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-52">
+                  {(["nav", "hero", "stats", "featureCard", "content", "pricingCard", "cta", "faq", "newsletter", "footer"] as const).map((k) => (
+                    <DropdownMenuItem key={k} onClick={() => addPageSection(k)}>
+                      <span className="capitalize">{k === "featureCard" ? "Features" : k === "content" ? "Testimonial" : k === "pricingCard" ? "Pricing" : k}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
             <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
               {elements.length === 0 ? (
                 <p className="text-xs text-muted-foreground/80 p-3">
-                  Click a shape tool and click on the canvas, or add a frame.
+                  Add a frame or page section (grid icon), or use Design with AI to create a full page.
                 </p>
               ) : (
                 elements.slice().reverse().map((el) => (
@@ -943,6 +1295,32 @@ export default function Stitch() {
                       {el.sectionKind === "tabBar" && (
                         <span className="text-[10px] font-medium text-foreground/70 text-center">{el.content}</span>
                       )}
+                      {el.sectionKind === "stats" && (
+                        <>
+                          <span className="text-lg font-bold text-foreground/90">{el.content}</span>
+                          <span className="text-[10px] text-foreground/70 mt-0.5">{el.subline}</span>
+                        </>
+                      )}
+                      {el.sectionKind === "pricingCard" && (
+                        <>
+                          <span className="text-sm font-semibold text-foreground/90">{el.content}</span>
+                          <span className="text-xs text-foreground/80 mt-0.5">{el.subline}</span>
+                          {el.ctaText && <span className="mt-2 px-2 py-1 rounded bg-primary/90 text-primary-foreground text-[10px] font-medium">{el.ctaText}</span>}
+                        </>
+                      )}
+                      {el.sectionKind === "faq" && (
+                        <>
+                          <span className="text-[11px] font-semibold text-foreground/90 block text-left w-full">{el.content}</span>
+                          <span className="text-[10px] text-foreground/70 text-left w-full line-clamp-2">{el.subline}</span>
+                        </>
+                      )}
+                      {el.sectionKind === "newsletter" && (
+                        <>
+                          <span className="text-sm font-semibold text-foreground/90">{el.content}</span>
+                          <span className="text-[10px] text-foreground/70 mt-0.5">{el.subline}</span>
+                          {el.ctaText && <span className="mt-1.5 px-3 py-1 rounded-md bg-primary text-primary-foreground text-[10px] font-medium">{el.ctaText}</span>}
+                        </>
+                      )}
                       {el.sectionKind === "logo" && (
                         <span className="text-sm font-semibold text-foreground/90">{el.content || el.label}</span>
                       )}
@@ -1142,7 +1520,7 @@ export default function Stitch() {
                   <p className="text-xs">&quot;Mobile app screen with nav and cards&quot;</p>
                   <p className="text-xs">&quot;Dashboard with sidebar and 4 cards&quot;</p>
                   <p className="text-xs">&quot;Signup form with logo and submit button&quot;</p>
-                  <p className="mt-3 text-xs">You’ll get a full layout (nav, hero, sections, footer) you can move and resize.</p>
+                  <p className="mt-3 text-xs">You’ll get a full layout you can edit. Use Export → HTML to download or copy a page you can post online.</p>
                 </div>
               ) : (
                 aiMessages.map((msg, i) => (
