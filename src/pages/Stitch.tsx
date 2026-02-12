@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
   MousePointer2,
@@ -19,6 +20,7 @@ import {
   Download,
   MinusCircle,
   ArrowRight,
+  ArrowLeft,
   Star,
   X,
 } from "lucide-react";
@@ -179,6 +181,7 @@ export default function Stitch() {
   const [aiMessages, setAiMessages] = useState<{ role: "user" | "assistant"; text: string }[]>([]);
   const aiChatEndRef = useRef<HTMLDivElement>(null);
 
+  const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement>(null);
   const elementsRef = useRef<CanvasElement[]>(elements);
   const isDraggingRef = useRef(false);
@@ -564,85 +567,92 @@ export default function Stitch() {
   ];
 
   const content = (
-    <div className="fixed inset-0 md:left-64 flex flex-col bg-background z-[100] pt-[max(env(safe-area-inset-top),44px)] md:pt-0">
-      {/* Top toolbar — Figma-style */}
-      <header className="flex-shrink-0 h-12 px-3 flex items-center justify-between border-b border-border/60 bg-card/95 backdrop-blur-sm">
-        <div className="flex items-center gap-0.5">
-          {tools.map(({ id, icon: Icon, label }) => (
-            <Button
-              key={id}
-              variant="ghost"
-              size="icon"
-              className={cn(
-                "h-8 w-8 rounded-md",
-                tool === id && "bg-muted text-foreground"
-              )}
-              onClick={() => setTool(id)}
-              title={label}
-            >
-              <Icon className="w-4 h-4" />
-            </Button>
-          ))}
-          <div className="w-px h-5 bg-border/60 mx-1" />
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}>
-            <Minus className="w-4 h-4" />
-          </Button>
-          <span className="min-w-[3rem] text-center text-xs font-medium tabular-nums">
-            {Math.round(zoom * 100)}%
-          </span>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setZoom((z) => Math.min(3, z + 0.25))}>
-            <ZoomIn className="w-4 h-4" />
-          </Button>
-        </div>
-
-        <div className="text-xs font-medium text-muted-foreground hidden sm:block">
-          Stitch · Whiteboard
-        </div>
-
-        <div className="flex items-center gap-1">
-          {selectedId && (
-            <Button variant="ghost" size="sm" className="gap-1.5 text-xs text-destructive hover:text-destructive" onClick={deleteSelected} title="Delete (Del)">
-              <Trash2 className="w-4 h-4" />
-              Delete
-            </Button>
-          )}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="gap-1.5 text-xs">
-                <Download className="w-4 h-4" />
-                Export
+    <div className="fixed inset-0 md:left-64 flex flex-col bg-background z-[100] pt-[max(env(safe-area-inset-top),44px)] pb-[env(safe-area-inset-bottom)] md:pt-0">
+      {/* Top toolbar: back + scrollable icons (fits mobile) */}
+      <header className="flex-shrink-0 h-12 min-h-12 px-2 sm:px-3 flex items-center gap-2 border-b border-border/60 bg-card/95 backdrop-blur-sm">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 flex-shrink-0 rounded-md"
+          onClick={() => navigate(-1)}
+          title="Back"
+          aria-label="Back"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </Button>
+        <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden">
+          <div className="flex items-center gap-0.5 sm:gap-1 py-1 pr-2" style={{ minWidth: "max-content" }}>
+            {tools.map(({ id, icon: Icon, label }) => (
+              <Button
+                key={id}
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  "h-8 w-8 flex-shrink-0 rounded-md",
+                  tool === id && "bg-muted text-foreground"
+                )}
+                onClick={() => setTool(id)}
+                title={label}
+              >
+                <Icon className="w-4 h-4" />
               </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleExportPNG}>Export as PNG</DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="default"
-            size="sm"
-            className="gap-1.5 text-xs bg-amber-500 hover:bg-amber-600 text-white"
-            onClick={() => setShowAIChat(true)}
-            title="Design with AI — describe a full page and watch it build"
-          >
-            <Sparkles className="w-4 h-4" />
-            Design with AI
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setShowLayers(!showLayers)}>
-            <Layers className="w-4 h-4" />
-            Layers
-          </Button>
-          <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setShowProps(!showProps)}>
-            <PanelRightOpen className="w-4 h-4" />
-            Design
-          </Button>
+            ))}
+            <div className="w-px h-5 bg-border/60 mx-0.5 flex-shrink-0" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setZoom((z) => Math.max(0.25, z - 0.25))}>
+              <Minus className="w-4 h-4" />
+            </Button>
+            <span className="min-w-[2.5rem] text-center text-xs font-medium tabular-nums flex-shrink-0">
+              {Math.round(zoom * 100)}%
+            </span>
+            <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => setZoom((z) => Math.min(3, z + 0.25))}>
+              <ZoomIn className="w-4 h-4" />
+            </Button>
+            <div className="w-px h-5 bg-border/60 mx-0.5 flex-shrink-0 hidden sm:block" />
+            <span className="text-xs font-medium text-muted-foreground hidden sm:inline flex-shrink-0">Stitch</span>
+            {selectedId && (
+              <Button variant="ghost" size="sm" className="gap-1 flex-shrink-0 text-xs text-destructive hover:text-destructive" onClick={deleteSelected} title="Delete (Del)">
+                <Trash2 className="w-4 h-4" />
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1 flex-shrink-0 text-xs">
+                  <Download className="w-4 h-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPNG}>Export as PNG</DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportJSON}>Export as JSON</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1 flex-shrink-0 text-xs bg-amber-500 hover:bg-amber-600 text-white"
+              onClick={() => setShowAIChat(true)}
+              title="Design with AI"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span className="hidden sm:inline">Design with AI</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-1 flex-shrink-0 text-xs" onClick={() => setShowLayers(!showLayers)}>
+              <Layers className="w-4 h-4" />
+              <span className="hidden sm:inline">Layers</span>
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-1 flex-shrink-0 text-xs" onClick={() => setShowProps(!showProps)}>
+              <PanelRightOpen className="w-4 h-4" />
+              <span className="hidden sm:inline">Design</span>
+            </Button>
+          </div>
         </div>
       </header>
 
-      <div className="flex flex-1 min-h-0">
-        {/* Left: Layers */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {/* Left: Layers — narrower on mobile so canvas fits */}
         {showLayers && (
-          <aside className="w-60 flex-shrink-0 border-r border-border/60 bg-card/80 backdrop-blur-sm flex flex-col">
+          <aside className="w-52 sm:w-60 flex-shrink-0 border-r border-border/60 bg-card/80 backdrop-blur-sm flex flex-col overflow-hidden">
             <div className="p-2 border-b border-border/50 flex items-center justify-between">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Layers
@@ -881,9 +891,9 @@ export default function Stitch() {
           </div>
         </main>
 
-        {/* Right: Design panel */}
+        {/* Right: Design panel — narrower on mobile */}
         {showProps && (
-          <aside className="w-64 flex-shrink-0 border-l border-border/60 bg-card/80 backdrop-blur-sm flex flex-col">
+          <aside className="w-52 sm:w-64 flex-shrink-0 border-l border-border/60 bg-card/80 backdrop-blur-sm flex flex-col overflow-hidden">
             <div className="p-3 border-b border-border/50">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Design
